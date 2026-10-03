@@ -1,5 +1,8 @@
 # Drive-mode concept
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [final-mode-architecture.md](../research/final-mode-architecture.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 ## E — Efficiency
 
 Normal operation is constrained to 4/8 or 6/8 firing density once eligibility conditions are met. 8/8 is reserved for a native kickdown power override, safety fallback or conditions in which E cannot be safely active.

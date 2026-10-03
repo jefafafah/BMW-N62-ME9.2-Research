@@ -1,5 +1,8 @@
 # Logging and test plan
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [in-car-validation-plan.md](../research/in-car-validation-plan.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 ## Minimum stock baseline channels
 
 - engine speed;

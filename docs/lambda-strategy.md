@@ -1,5 +1,8 @@
 # Lambda strategy
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [lambda-control.md](../research/lambda-control.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 ## Goals
 
 - Keep stock protection and high-load enrichment intact.

@@ -170,7 +170,7 @@ def main() -> int:
     check(touched(0x3FC2FC, 0xFACDB4, "W") and touched(0x3FC2B6, 0xFACDDC, "W"),
           "0x3FC2FC (air-mass flow) and its byte form 0x3FC2B6 (x input of cut-lambda curve 0x1C6408) written by EXT fn 0xFACD74")
     check(touched(0x5B96AA, 0x5709C) and dform(img, 0x570E8) == (14, 12, 19, -0xFFF) and dform(img, 0x570EC)[3] == 3,
-          "bank-A closed loop 0x3FC1E3 requires snapped setpoint 0x5B96AA within 0x0FFF..0x1001 (lambda 1.000)")
+          "bank-A lambda modulation flag 0x3FC1E3 requires snapped setpoint 0x5B96AA within 0x0FFF..0x1001 (lambda 1.000)")
     check(touched(0x5B989E, 0x574DC, "W") and touched(0x3FC1EE, 0x570A8),
           "controller states (e.g. 0x5B989E) are reset to 0 when lambda release 0x3FC1EE is off")
     check(img.u32(0x57D00) == 0x618C8000 and touched(0x5B989E, 0x57C9C),
@@ -260,6 +260,407 @@ def main() -> int:
           "second 0x5B97F0 divisor (0x5B9824 -> 0x5B9826, INT 0x475D8 / EXT 0xF88874) gated by CAL bit 0x10: inactive")
     check(img.u32(0x5F684) == 0x554A07FE and img.u8(0x1C7AB4) & 1 == 0 and touched(0x5B9982, 0x5F6D0),
           "INT 0x5F52C reads 0x5B9982 only when CAL 0x1C7AB4 bit0 set (=0x00): inactive in this calibration")
+
+    # ===== final pass: 0x0BA / 0x0B5 / 0x5C3 status fields =====
+    # --- egs_status: 0x0BA / 0x0B5 status fields and their consumers ----------
+    # 0x0BA byte0 bit6 -> 0x3FBEE0, bit7 -> 0x3FBEDF; both forced to 1 on 0x0BA timeout (> 50 calls)
+    check(img.u32(0x393C0) == 0x54C9D1BE and img.u32(0x393D0) == 0x54CA07FE and touched(0x3FBEE0, 0x393D4, "W")
+          and img.u32(0x393DC) == 0x7CCC0E70 and touched(0x3FBEDF, 0x393E4, "W")
+          and dform(img, 0x3947C) == (14, 5, 0, 1) and touched(0x3FBEDF, 0x39484, "W") and touched(0x3FBEE0, 0x3948C, "W"),
+          "0x0BA byte0 bit6 -> 0x3FBEE0, bit7 -> 0x3FBEDF (INT 0x393C0..0x393E4); both := 1 on 0x0BA timeout")
+    # 0x0B5 bytes 0-3 (signal 0x14) and 0x5C3 bytes 4-7 (signal 0x2D) have no reader; every read-API call has a constant signal
+    egs_rd = [r.get(3) for p, t, r in calls if t == 0x63660]
+    check(len(egs_rd) >= 37 and None not in egs_rd and 0x14 not in egs_rd and 0x2D not in egs_rd,
+          "CAN read API INT 0x63660: all call sites constant; 0x14 (0x0B5 bytes0-3) and 0x2D (0x5C3 bytes4-7) not read via the API")
+    # 0x0B5 byte5 bits6-7 != 0 -> 0x3FBEDD
+    check(img.u32(0x3975C) == 0x57EC93BE and img.u32(0x39760) == 0x558607BE and touched(0x3FBEDD, 0x39774, "W"),
+          "0x0B5 byte5 bits6-7 (word bits 14-15) != 0 -> 0x3FBEDD")
+    # 0x3FBEDD gates a slew-rate limiter: 0x3FB460 is the previous output 0x5B981C, step 0x3FB45E = curve 0x1CF412(0x5B9D20)
+    check(touched(0x3FBEDD, 0x463B0) and dform(img, 0x4639C) == (14, 18, 18, -0x4BA0) and touched(0x3FB460, 0x463BC)
+          and touched(0x3FB45E, 0x463C4) and img.u32(0x46420) == 0xA3F60000 and img.u32(0x46424) == 0xB3F20000
+          and touched(0x5B981C, 0x46390) and call_with(0xF889B0, 0x16CD4, 0x1CF412) and touched(0x3FB45E, 0xF889B8, "W")
+          and touched(0x5B9D20, 0xF889AC),
+          "0x3FBEDD: 0x5B981C = min(KFPED, prev 0x3FB460 + step 0x3FB45E); 0x3FB460 := 0x5B981C every call; step = curve 0x1CF412(0x5B9D20)")
+    check(img.u16(0x1CF412) == 2 and [img.u16(0x1CF414 + 2 * i) for i in range(4)] == [1280, 3840, 164, 32735],
+          "step curve 0x1CF412: 2 points, x 1280/3840 -> step 164/32735 (limit only at low x)")
+    # misfire-type detector INT 0x23338 second threshold: EE0 -> 0x3FA8A0 (map 0x1C1500), EDF -> 0x3FA89C (0x1C1480), else 0x3FA8A8 (0x1C1400)
+    check(touched(0x3FBEE0, 0x23668) and touched(0x3FA8A0, 0x23678) and touched(0x3FA89C, 0x2368C) and touched(0x3FA8A8, 0x23698)
+          and call_with(0x5C574, 0x192C8, 0x1C1500) and touched(0x3FA8A0, 0x5C598, "W")
+          and call_with(0x5C5B0, 0x192C8, 0x1C1480) and touched(0x3FA89C, 0x5C5D4, "W")
+          and call_with(0x5C5EC, 0x192C8, 0x1C1400) and touched(0x3FA8A8, 0x5C610, "W"),
+          "INT 0x23338 threshold offset: 0x3FBEE0 -> map 0x1C1500, else 0x3FBEDF -> map 0x1C1480, else map 0x1C1400")
+    m_ee0 = [img.u16(0x1C1500 + 2 * i) for i in range(64)]
+    m_edf = [img.u16(0x1C1480 + 2 * i) for i in range(64)]
+    m_def = [img.u16(0x1C1400 + 2 * i) for i in range(64)]
+    check(img.u8(0x1C1228) == 8 and m_ee0 != m_def and m_edf != m_def and m_ee0 != m_edf
+          and any(a > b for a, b in zip(m_ee0, m_def)) and any(a < b for a, b in zip(m_ee0, m_def))
+          and any(a < b for a, b in zip(m_edf, m_def)),
+          "maps 0x1C1500/0x1C1480/0x1C1400 (8x8 u16) all differ; EE0/EDF maps are neither uniformly higher nor lower")
+    # first stage of 0x23338: EDF/default threshold maps 0xFFFF and the three factor maps identical -> no bit effect
+    check(all(img.u16(a + 2 * i) == 0xFFFF for a in (0x1C1680, 0x1C1600) for i in range(64))
+          and [img.u8(0x1C1700 + i) for i in range(64)] == [img.u8(0x1C1740 + i) for i in range(64)] == [img.u8(0x1C1780 + i) for i in range(64)]
+          and call_with(0x5C788, 0x192C8, 0x1C1680) and call_with(0x5C7D4, 0x192C8, 0x1C1600),
+          "INT 0x23338 first stage: EDF/default maps 0x1C1680/0x1C1600 all 0xFFFF; factor maps 0x1C1700/40/80 identical")
+    # INT 0x23734: 0x3FC239 -> map 0x1C19B4 (all 0xFFFF), EE0 -> 0x1C1934, EDF -> 0x1C18B4, else 0x1C1834
+    check(touched(0x3FC239, 0x23890) and touched(0x3FBEE0, 0x238C8) and touched(0x3FBEDF, 0x23900)
+          and call_with(0x5C880, 0x192C8, 0x1C19B4) and call_with(0x5C8D4, 0x192C8, 0x1C1934)
+          and call_with(0x5C910, 0x192C8, 0x1C18B4) and call_with(0x5C94C, 0x192C8, 0x1C1834)
+          and all(img.u16(0x1C19B4 + 2 * i) == 0xFFFF for i in range(64)),
+          "INT 0x23734 threshold: 0x3FC239 -> 0x1C19B4 (all 0xFFFF = blanking), 0x3FBEE0 -> 0x1C1934, 0x3FBEDF -> 0x1C18B4, else 0x1C1834")
+    # INT 0x5C99C: EDF/EE0 edge events gated by CAL 0x1C1AC8 bits 0/1, both clear
+    check(is_r2_ref(img, 0x5C9D0, 0x1C1AC8) and img.u32(0x5C9D4) == 0x558C07FE and touched(0x3FBEDF, 0x5C9E4)
+          and is_r2_ref(img, 0x5CA40, 0x1C1AC8) and img.u32(0x5CA44) == 0x558CFFFE and touched(0x3FBEE0, 0x5CA54)
+          and img.u8(0x1C1AC8) & 3 == 0 and touched(0x5B8E8D, 0x5CC64, "W"),
+          "INT 0x5C99C: 0x3FBEDF/0x3FBEE0 edge events into 0x5B8E8D enabled by CAL 0x1C1AC8 bit0/bit1 = 0 (inactive)")
+    # INT 0x4533C (anti-jerk observer): any change of 0x3FBEE0/0x3FBEDF vs stored copies 0x3FB41F/0x3FB41E -> reset
+    check(dform(img, 0x4577C) == (14, 4, 4, -0x4120) and dform(img, 0x45790) == (14, 3, 3, -0x4121)
+          and dform(img, 0x45788) == (14, 23, 23, -0x4BE1) and dform(img, 0x4579C) == (14, 26, 26, -0x4BE2)
+          and touched(0x3FB41F, 0x457F0) and img.u32(0x4594C) == 0x89980000 and img.u32(0x45950) == 0x999A0000
+          and img.u32(0x45954) == 0x89750000 and img.u32(0x45958) == 0x99770000 and touched(0x3FC182, 0x45868, "W"),
+          "INT 0x4533C: edge of 0x3FBEE0 or 0x3FBEDF (vs 0x3FB41F/0x3FB41E) -> observer reset 0x3FC182 := 1")
+    # EXT 0xFA4628: 0x3FBEDF selects per-gear vs constant parameter tables; output gain 0x5B93CF tables zero with EGS present
+    check(touched(0x3FBED1, 0xFA4648) and touched(0x3FBEDF, 0xFA46A4) and touched(0x5B93CF, 0xFA46F4, "W") and touched(0x5B93CF, 0xFA4740, "W")
+          and all(img.u8(0x1CF300 + i) == 0 and img.u8(0x1CF308 + i) == 0 for i in range(7))
+          and [img.u16(0x1CF34E + 2 * i) for i in range(7)] == [0] + [135] * 6
+          and touched(0x5B93CF, 0x317D4) and img.u32(0x317DC) == 0x7FEB51D6 and touched(0x5B97C2, 0x31838, "W"),
+          "EXT 0xFA4628: 0x3FBEDF -> gear-independent table 0x1CF34E; gain 0x5B93CF (0x1CF300/0x1CF308) = 0 with EGS -> 0x5B97C2 output 0")
+    # 0x0B5 byte4 bits6/7 (exactly one) -> 0x5BBAC7.2 -> coolant target 0x5B91D1 := CAL 0x1D08FB (177)
+    check(touched(0x3FBEDB, 0xF9E384) and touched(0x3FBEDC, 0xF9E394) and touched(0x5BBAC7, 0xF9E3F4)
+          and touched(0x5B91D1, 0xF9E410, "W") and img.u8(0x1D08FB) == 177 and img.u16(0x1D08FE) & 1 == 1,
+          "0x0B5 byte4 bit6 XOR bit7 -> 0x5BBAC7.2 -> coolant target 0x5B91D1 = CAL 0x1D08FB (177); default when invalid = 1")
+    # ===== final pass: torque CAN, EGS/DSC decode, arbitration =====
+    # --- torque topic (proposed): CAN torque scaling, EGS/DSC decode, arbitration ---------------
+    # CAN torque scale: 0x5B922A := CAL 0x1C1150 (stock 0x24); RX factor 0x5B94B6 := 0x800 / CAL 0x1C1150
+    check(is_r2_ref(img, 0xF3C578, 0x1C1150) and touched(0x5B922A, 0xF3C57C, "W")
+          and dform(img, 0xF3C5A4) == (14, 11, 0, 0x800) and is_r2_ref(img, 0xF3C5A8, 0x1C1150)
+          and touched(0x5B94B6, 0xF3C5B0, "W"),
+          "torque CAN scale: 0x5B922A = CAL 0x1C1150 (TX); 0x5B94B6 = 0x800 / CAL 0x1C1150 (RX inverse) in EXT fn 0xF3C574")
+    # TX converter INT 0x4BCCC: ((T>>1)-(ref>>1)) * 0x5B922A >> 10, clamp to s12
+    check(touched(0x5B94BC, 0x4BCD0) and touched(0x5B922A, 0x4BD10) and img.u32(0x4BD18) == 0x7C845670
+          and dform(img, 0x4BD1C) == (11, 0, 4, -0x800) and dform(img, 0x4BD2C) == (11, 0, 4, 0x7FF),
+          "TX torque converter INT 0x4BCCC: ((T>>1)-(0x5B94BC>>1))*0x5B922A>>10, clamped to -0x800..0x7FF")
+    # 0x4BDDC: reference = loss torque 0x5B97AA; conv(0) -> 0x5B94D0 (0x0A9 bits 16-27 = -loss)
+    check(touched(0x5B97AA, 0x4BE20) and touched(0x5B94BC, 0x4BE24, "W") and dform(img, 0x4BE78) == (14, 3, 0, 0)
+          and any(p == 0x4BE7C and t == 0x4BCCC for p, t, _ in calls) and touched(0x5B94D0, 0x4BE84, "W"),
+          "INT 0x4BDDC: reference 0x5B94BC := 0x5B97AA and word 0x5B94D0 = conv(0) = -(loss torque)")
+    check(any(p == 0x4BE90 and t == 0x4BD40 for p, t, _ in calls) and touched(0x5B983A, 0x4BE4C)
+          and touched(0x5B9784, 0x4BD84),
+          "0x5B983A (actual torque) is the only word converted by INT 0x4BD40 (adds signed 0x5B9784)")
+    # loss torque producer INT 0x60654
+    check(call_with(0x60680, 0x17B64, 0x1C789A) and touched(0x3FC302, 0x60678) and touched(0x5B97AE, 0x607E0)
+          and touched(0x5B97AA, 0x607F4, "W"),
+          "loss torque 0x5B97AA (INT 0x60654) = map 0x1C789A(rpm, rel. charge 0x3FC302) + further addends incl. 0x5B97AE")
+    # actual torque 0x5B983A = 0x5B97E0 * ignition efficiency * firing fraction (INT 0x4790C)
+    check(touched(0x5B92EC, 0x47928) and dform(img, 0x4792C) == (7, 11, 11, 200) and touched(0x3FC2EF, 0x47940)
+          and touched(0x5B97E0, 0x47A50) and touched(0x5B983A, 0x47A98, "W"),
+          "INT 0x4790C: 0x5B983A = 0x5B97E0 x eta(ign. retard 0x5B93DC-0x3FC2EF) x (200-cut*25)/200")
+    # 0x0B6 (DSC) raw decode EXT 0xF1241C: RX buffer handle 0x0C, checksum seed 0xB6
+    check(msgs.get(0x0C, {}).get("can_id") == 0x0B6 and touched(0x3FAE9C, 0xF1252C)
+          and dform(img, 0xF12530) == (34, 12, 28, 0x0C * 0x14) and dform(img, 0xF12770) == (14, 12, 12, 0xB6)
+          and touched(0x3FA046, 0xF125D0, "W") and touched(0x3FA044, 0xF12640, "W") and touched(0x3FA042, 0xF12658, "W"),
+          "0x0B6 decoded from raw RX buffer (handle 0x0C) in EXT 0xF1241C: s12 bits12-23 -> 0x3FA046, bits24-35 -> 0x3FA044, mode -> 0x3FA042, checksum seed 0xB6")
+    # 0x0B5 (EGS) raw decode EXT 0xF15450: handle 0x0B, checksum seed 0xB5
+    check(msgs.get(0x0B, {}).get("can_id") == 0x0B5 and dform(img, 0xF15550) == (34, 12, 29, 0x0B * 0x14)
+          and dform(img, 0xF15824) == (14, 12, 12, 0xB5) and touched(0x3FA04E, 0xF155F0, "W")
+          and touched(0x3FA04C, 0xF15660, "W") and touched(0x3FA048, 0xF1567C, "W"),
+          "0x0B5 bytes 0-7 decoded from raw RX buffer (handle 0x0B) in EXT 0xF15450: s12 bits12-23 -> 0x3FA04E, bits24-35 -> 0x3FA04C, mode -> 0x3FA048")
+    # EGS mode 2 -> reduction limit 0x5B94A4 = raw*0x5B94B6 + 0x5B94BC; mode 1 -> increase flag 0x3FBEB8
+    check(dform(img, 0x4AA34) == (11, 0, 24, 2) and touched(0x3FA04E, 0x4AA40) and touched(0x5B94B6, 0x4A9EC)
+          and touched(0x5B94BC, 0x4A9F8) and dform(img, 0x4AB9C) == (11, 0, 24, 1) and touched(0x3FBEB8, 0x4ABA8, "W"),
+          "INT 0x4A700: EGS mode 2 -> torque limit 0x5B94A4 = 0x3FA04E*0x5B94B6+0x5B94BC; mode 1 -> 0x3FBEB8")
+    check(touched(0x3FBEB8, 0x48670) and touched(0x3FC19F, 0x48634, "addr") and img.u32(0x48698) == 0x98E60000,
+          "EGS torque-increase flag 0x3FBEB8 blocks the all-cylinder overrun cut 0x3FC19F (INT 0x484F8)")
+    # DSC: mode 1/2 flags, ASC limit 0x5B949A from 0x0B6 via inverse converter
+    check(touched(0x3FA042, 0xFB5E68) and touched(0x3FBEB4, 0xFB5E78, "W") and touched(0x3FBEB3, 0xFB5E88, "W")
+          and touched(0x5B94B6, 0xFB5EB8) and touched(0x5B94BC, 0xFB5EB0) and touched(0x5B949A, 0xFB609C, "W"),
+          "EXT 0xFB5B78: 0x0B6 mode -> 0x3FBEB4 (=1) / 0x3FBEB3 (=2); torque raw*0x5B94B6+0x5B94BC -> 0x5B949A/0x5B949E")
+    # fast-path arbitration INT 0x47AB0
+    check(touched(0x5B9832, 0x47B98) and touched(0x5B9870, 0x47BB4) and touched(0x5B983E, 0x47C00, "W")
+          and touched(0x5B94A0, 0x47C08) and touched(0x5B94A8, 0x47C3C) and touched(0x5B9846, 0x47C60, "W")
+          and touched(0x5B949A, 0x47C70) and touched(0x3FC195, 0x47C8C, "W"),
+          "INT 0x47AB0: min(request, 0x5B9832, rev limit 0x5B9870, ext. limit) -> 0x5B983E; max(.., 0x5B94A0, 0x5B94A8) -> 0x5B9846; 0x3FC195 from DSC 0x5B949A")
+    # rev limiter INT 0x48B04 (6500 rpm normal limit, 0.25 rpm/bit)
+    check(is_r2_ref(img, 0x48B6C, 0x1C8B32) and is_r2_ref(img, 0x48BB0, 0x1C8B30) and is_r2_ref(img, 0x48BB8, 0x1C8B2E)
+          and img.u16(0x1C8B2E) == 26000 and touched(0x5B9870, 0x48C5C, "W") and touched(0x3FC1A3, 0x48C68, "W"),
+          "rev limiter INT 0x48B04: limit CAL 0x1C8B2E (26000 = 6500 rpm) / 0x1C8B30 / 0x1C8B32 -> torque limit 0x5B9870, active flag 0x3FC1A3")
+    # ignition intervention INT 0x32EE8
+    check(touched(0x3FC32A, 0x32F44) and touched(0x5B985C, 0x33014) and is_r2_ref(img, 0x3327C, 0x1CAB68)
+          and touched(0x5B9434, 0x33334, "W"),
+          "INT 0x32EE8: ignition reduction from target 0x3FC32A (floored at 0x5B985C) -> torque-based ignition angle 0x5B9434")
+    # slow (air) path INT 0x480AC; EGS limit enters via 0x5B9834 (EXT 0xFA488C)
+    check(touched(0x5B94A2, 0xFA4938) and touched(0x5B9834, 0xFA493C, "W") and touched(0x5B9834, 0x48424)
+          and touched(0x5B949A, 0x4842C) and touched(0x5B9852, 0x484E0, "W"),
+          "slow path: EGS 0x5B94A2 -> 0x5B9834 (EXT 0xFA488C); INT 0x480AC 0x5B9852 = min(.., 0x5B9834, DSC 0x5B949A, ..)")
+    check(img.u8(0x1C8A18) & 3 == 1 and img.u32(0x48640) == 0x556B07BC,
+          "AEVAB enable control word CAL 0x1C8A18 = bit0 set (0x3FC195 enables cut), bit1 clear (0x3FC162 does not)")
+    # ===== final pass: Valvetronic / VANOS =====
+    # --- valvetronic_vanos final pass ------------------------------------------
+    # Valvetronic: CAN frame layout (one u16 request per frame, bytes 2-3 of signal 0x36/0x38)
+    check(img.u32(0x4FE10) == 0x57EC801E and img.u32(0x4FE14) == 0x7CCC6378 and img.u32(0x4FF84) == 0x57EB801E
+          and any(p == 0x4FE50 and t2 == 0x63C3C and r.get(3) == 0x37 for p, t2, r in calls)
+          and any(p == 0x4FFC0 and t2 == 0x63C3C and r.get(3) == 0x39 for p, t2, r in calls),
+          "Valvetronic frames 0x105/0x10D: request u16 packed into bits 16-31 of signal 0x36/0x38; 0x37/0x39 carry status byte only")
+    check(img.u32(0x500DC) == 0x1F6A06E9 and touched(0x5B8AEA, 0x500E8) and touched(0x5B9D16, 0x50104, "W")
+          and img.u32(0x504B4) == 0x1D0A06E9 and touched(0x5B8AEC, 0x504C0) and touched(0x5B9D14, 0x504DC, "W"),
+          "Valvetronic feedback: CAN 0x185 raw*0x6E9>>16 - trim 0x5B8AEA -> 0x5B9D16; CAN 0x18D - trim 0x5B8AEC -> 0x5B9D14")
+    check(img.u32(0x50274) == 0x392006E9 and touched(0x5B9D16, 0x50278, "W") and img.u32(0x50330) == 0x396006E9
+          and touched(0x5B9D16, 0x50334, "W") and img.u32(0x5064C) == 0x392006E9 and touched(0x5B9D14, 0x50650, "W"),
+          "Valvetronic feedback substitute on timeout/invalid: actual := 0x6E9 (full-range value) per bank")
+    check(any(p == 0x4EC14 and t2 == 0x16CD4 for p, t2, r in calls) and is_r2_ref(img, 0x4EC10, 0x1C50BE)
+          and touched(0x5B9BB4, 0x4EC40, "W") and img.u32(0x4ECC0) == 0x2C1F09F6 and img.u32(0x4ECD4) == 0x3980000A,
+          "lift target (0x5B9BB0) -> curve CAL 0x1C50BE -> request units 0x5B9BB4; 0x5B9047 = value/10 (0xFF above 2550)")
+    check(img.u16(0x1C50BE) == 12 and img.u16(0x1C50BE + 2) == 130 and img.u16(0x1C50BE + 24) == 9600
+          and img.u16(0x1C50BE + 26) == 36 and img.u16(0x1C50BE + 48) == 1740,
+          "curve CAL 0x1C50BE: x 130..9600 (lift, um) -> y 36..1740 (request units, max 0x6EA=1770)")
+    check(touched(0x3FC1BD, 0x4E3F8) and is_r2_ref(img, 0x4E404, 0x1C503A) and touched(0x3FC1C2, 0x4E420)
+          and is_r2_ref(img, 0x4E42C, 0x1C51A6) and touched(0x5B8F26, 0x4E438) and is_r2_ref(img, 0x4E454, 0x1C507C),
+          "lift target priority in INT 0x4E21C: 0x3FC1BD -> pedal curve 0x1C503A; 0x3FC1C2 -> fixed CAL 0x1C51A6; 0x5B8F26 -> rpm curve 0x1C507C")
+    check(is_r2_ref(img, 0x4E4F4, 0x1C4D3C) and is_r2_ref(img, 0x4E50C, 0x1C4C98) and is_r2_ref(img, 0x4E538, 0x1C4A2C)
+          and is_r2_ref(img, 0x4E54C, 0x1C4B62) and img.u32(0x4E560) == 0x7D8C59D6 and is_r2_ref(img, 0x4E57C, 0x1C47E8),
+          "INT 0x4E21C mode 0x5B8ED6: start maps 0x1C4D3C/0x1C4C98, idle maps 0x1C4A2C/0x1C4B62 blended by 0x5B9048; else main map 0x1C47E8")
+    check(is_r2_ref(img, 0xFB5164, 0x1C51A8) and touched(0x5B9BB0, 0xFB516C, "W") and touched(0x3FE954, 0xFB5110)
+          and is_r2_ref(img, 0x4EAFC, 0x1C51A8),
+          "engine-not-running / rpm=0 lift target = CAL 0x1C51A8 (EXT 0xFB50E4, INT 0x4EAFC)")
+    check(touched(0x5B9BB0, 0xF884A4) and img.u32(0xF88710) == 0x2C1F0000 and touched(0x5B8AEA, 0xF8871C, "W")
+          and img.u32(0xF88734) == 0x7D7F00D0 and touched(0x5B8AEC, 0xF88738, "W"),
+          "bank balance EXT 0xF88494: one signed value per lift range -> positive to trim 0x5B8AEA, negative (negated) to 0x5B8AEC")
+    # VANOS
+    check(img.u32(0x3F68C) == 0x2C0C1C20 and is_r2_ref(img, 0x3F72C, 0x1CA870) and img.u32(0x3F750) == 0x2C0B0708
+          and img.u32(0x3F75C) == 0x6063F8F8 and img.u32(0x3F79C) == 0x2C0B0003,
+          "cam angle fetch INT 0x3F60C: raw <= 7200, minus CAL 0x1CA870[i], reduced modulo 1800 (edge index 0..3)")
+    check(img.u32(0x3F53C) == 0x546B07FE and is_r2_ref(img, 0x3F548, 0x1CA878) and img.u32(0x3F554) == 0x7C646050
+          and img.u32(0x3F56C) == 0x7C646214 and img.u32(0x3F588) == 0x7C0B5000,
+          "INT 0x3F3B8: odd objects position = CAL 0x1CA878[i] - delta, even = delta + CAL 0x1CA878[i]; clamped to 0x1CA878[i]")
+    check(is_r2_ref(img, 0xF2D27C, 0x1C6DA2) and img.u32(0xF2D284) == 0x1D4A000A and img.u32(0xF2D2BC) == 0x2C091C20
+          and [img.u16(0x1C6DA2 + 2 * i) for i in range(4)] == [1320, 720, 1320, 720],
+          "cam edge plausibility windows EXT 0xF2D274: CAL 0x1C6DA2[i] -/+ 10*byte, wrap at 7200; nominal 1320/720/1320/720")
+    check(touched(0x5B8DA6, 0xFACDE4) and touched(0x5B8DCA, 0xFACE08) and img.u32(0xFACE0C) == 0x7FCADA14 and touched(0x5B9B04, 0xFACE10, "W")
+          and touched(0x5B8D92, 0xFACE98) and touched(0x5B8DB6, 0xFACEBC) and img.u32(0xFACEC0) == 0x7F89F214 and touched(0x5B9B02, 0xFACEC4, "W"),
+          "air model EXT 0xFACD74 sums measured positions per pair: obj0+obj1 -> 0x5B9B04, obj2+obj3 -> 0x5B9B02")
+    check(touched(0x5B8DCA, 0x4E5D4) and touched(0x5B8DCC, 0x4E5E8) and touched(0x5B9BCC, 0x4E5D8, "W")
+          and touched(0x5B9E02, 0x3E3A8, "W") and touched(0x5B9E02, 0x4E628) and is_r2_ref(img, 0x4E6D4, 0x1C652E),
+          "Valvetronic fn INT 0x4E21C uses only type-A cam position (obj0 measured/target or 0x5B9E02) with lift curve 0x1C652E")
+    check(img.u32(0x3E688) == 0x3BA00384 and img.u32(0x3EE4C) == 0x3A600384 and touched(0x3FE954, 0x3E5EC) and touched(0x5B8D7A, 0x3E608),
+          "VANOS target composer: default/park request 0x384 for both target bytes when engine not running, before start end, very cold or in start delay")
+    # ===== final pass: ignition / knock =====
+    # --- ignition / knock structure (CONFIRMED items only) -------------------
+    # base/alternate maps in INT fn 0x49600
+    check(is_r2_ref(img, 0x49794, 0x1CAD5A) and touched(0x5B9001, 0x4978C) and touched(0x3FC2F5, 0x49790)
+          and is_r2_ref(img, 0x4980C, 0x1CB186) and is_r2_ref(img, 0x49834, 0x1CAF04) and touched(0x5B8872, 0x497E8),
+          "ign: map A 0x1CAD5A(rpm 0x5B9001, filtered load 0x3FC2F5); B = 0x5B8872 ? 0x1CB186 : 0x1CAF04")
+    check(touched(0x5B903C, 0x4984C) and img.u32(0x49850) == 0x7E7351D6 and img.u32(0x49854) == 0x7E7A4670
+          and touched(0x5B9453, 0x49874, "W") and touched(0x5B9452, 0x499C0, "W"),
+          "ign: 0x5B9453/0x5B9452 = A + (B-A)*0x5B903C>>8 (predicted-load / actual-load variants)")
+    check(touched(0x5B8F26, 0x4989C) and is_r2_ref(img, 0x498A8, 0x1CB384) and is_r2_ref(img, 0x49944, 0x1CB414)
+          and any(p == 0x498C0 and t == 0x19234 for p, t, r in calls),
+          "ign: full-load flag 0x5B8F26 selects 24x6 maps 0x1CB384/0x1CB414 (pre-searched axes, helper 0x19234)")
+    check(touched(0x3FC0F4, 0x49BDC) and touched(0x3FC0DC, 0x49BEC) and touched(0x5B9459, 0x49C00)
+          and touched(0x5B9454, 0x49C04, "W") and is_r2_ref(img, 0x49F60, 0x1CB644) and is_r2_ref(img, 0x49EF8, 0x1CB4C4),
+          "ign: 0x3FC0F4 && 0x3FC0DC -> 0x5B9454 = 0x5B9459 (maps 0x1CB644 + 0x1CB4C4*k/128, fn 0x49E94)")
+    check(touched(0x5B93D4, 0x49E24) and touched(0x5B93D5, 0x49E34) and is_r2_ref(img, 0x49DEC, 0x1CB4B9)
+          and touched(0x5B9454, 0x49E7C, "W") and img.u32(0x49E1C) == 0x7C723E70,
+          "ign: 0x5B9454 = sat(base + 0x5B93D4 + 0x5B93D5 + curve 0x1CB4B9(IAT)*map 0x1D0664>>7)")
+    # final per-cylinder sum and output limits
+    check(touched(0x5B9454, 0x333DC) and touched(0x5B9462, 0x333E8) and is_r2_ref(img, 0x333F8, 0x1CABAB)
+          and touched(0x3FC2D9, 0x33408) and img.u32(0x3340C) == 0x7CAA5850 and touched(0x5B9360, 0x33458, "addr"),
+          "ign: INT 0x333CC Z = 0x5B9454 + 0x5B9462 + 0x5B940B + CAL 0x1CABAB - 0x3FC2D9 + 0x5B9360[cyl]")
+    check(touched(0x3FC169, 0x33428) and touched(0x5B9461, 0x33438),
+          "ign: 0x3FC169 == 0 -> Z = start angle 0x5B9461 + 0x5B940B + CAL 0x1CABAB")
+    check(touched(0x5B9460, 0x33924) and touched(0x5B9434, 0x33930) and dform(img, 0x33710)[0] == 11
+          and dform(img, 0x33710)[3] == 0x48 and dform(img, 0x33724)[3] == -0x20 and touched(0x5B9438, 0x336DC),
+          "ign: applied = min(Z, max(0x5B9434, 0x5B9460)); 0x5B9440[] = clamp(applied + 0x5B9438, -0x20, +0x48)")
+    check(touched(0x3FC19F, 0x33688) and touched(0x3FC282, 0x33698, "W") and touched(0x5B9460, 0x336CC)
+          and touched(0x3FC282, 0x495F8, "W") and touched(0x5B92EC, 0x495E4),
+          "ign: overrun cut 0x3FC19F latches 0x3FC282 -> all angles = 0x5B9460; released when cut ends and 0x5B92EC < 8")
+    check(touched(0x5B9440, 0x30CD8) and img.u32(0x30CE4) == 0x1D6B000F and img.u32(0x30CE8) == 0x7D6B0E70,
+          "ign: output scheduler converts angle byte x15/2 (0.1 deg units) -> 0.75 deg/bit")
+    # torque model: forward efficiency and inverse (intervention) path
+    check(touched(0x5B93DC, 0x4A660) and touched(0x5B9460, 0x4A44C, "addr") and is_r2_ref(img, 0x4A6A0, 0x1C7DC4)
+          and touched(0x5B8B1C, 0x4A6B4) and img.u32(0x4A6E4) == 0x217B00C8 and touched(0x3FC2F9, 0x4A6E8, "W"),
+          "tq: 0x3FC2F9 = 200 - table 0x1C7DC4[0x5B93DC - 0x5B9460] * 0x5B8B1C >> 5 (efficiency at latest angle)")
+    check(touched(0x3FC32A, 0x32F44) and touched(0x5B97DA, 0x32F4C) and is_r2_ref(img, 0x3327C, 0x1CAB68)
+          and is_r2_ref(img, 0x332E0, 0x1CAA9C) and touched(0x5B93DC, 0x33308) and touched(0x5B9434, 0x33334, "W"),
+          "tq: intervention angle 0x5B9434 = 0x5B93DC - inverse-efficiency(0x1CAB68 / 0x1CAA9C) of required ratio")
+    # knock control
+    check(dform(img, 0x37498) == (14, 11, 11, -0x244C) and img.u32(0x37304) == 0x558C1838 and img.u32(0x37310) == 0x1D6B0028
+          and img.u32(0x3732C) == 0x3B2000A0 and touched(0x3FC18B, 0x37320) and dform(img, 0x44E58)[3] == 0xA8,
+          "knock: adaptation table 0x3FDBB4[0xA8], cell offset 0x5B936F*8 + 0x5B936E*40 (0xA0 when 0x3FC18B)")
+    check(touched(0x3FC101, 0x374C8) and touched(0x5B9369, 0x37740) and touched(0x5B936A, 0x37790)
+          and touched(0x3FC0F4, 0x37450) and img.u32(0x37B2C) == 0x7ECC00D0 and touched(0x5B935C, 0x37B34, "W"),
+          "knock: retard += step 0x5B9369 on knock 0x3FC101, capped 0x5B936A; 0x5B9360[cyl] = -retard")
+    check(touched(0x3FC0ED, 0x36EB0) and is_r2_ref(img, 0x371E8, 0x1C71A5) and is_r2_ref(img, 0x37210, 0x1C71A7)
+          and touched(0x3FC2D9, 0x371E0, "W") and touched(0x5B8DE0, 0x37090),
+          "knock: dynamic retard 0x3FC2D9 decays by CAL 0x1C71A5 every CAL 0x1C71A7 cycles; phase flag from 0x5B8DE0")
+    check(img.u32(0xF31D7C) == 0x39292586 and img.u32(0xF31D78) == 0x54692834 and touched(0x5B9306, 0xF31D5C, "W"),
+          "temp: 0x5B96DA = 0x5B9306*32 + 0x2586 (Kelvin*128/3) -> 0x5B9306 is 0.75 degC/bit, -48 degC offset")
+    # ===== final pass: lambda architecture =====
+    # --- lambda architecture (topic: lambda) ---------------------------------
+    # arbitration INT 0x1A5E4 (called from INT 0x5563C / EXT 0xF7E340)
+    check(touched(0x5B9C2E, 0x1A5E8) and touched(0x5B891A, 0x1A5F0) and img.u32(0x1A5F4) == 0x7C074000
+          and img.u32(0x1A5F8) == 0x4080000C and img.u32(0x1A5FC) == 0x7CE83B78,
+          "lambda arbitration INT 0x1A5E4: bank-A rich request = min(full-load 0x5B891A, protection 0x5B9C2E)")
+    check(touched(0x5B9C2C, 0x1A778) and img.u32(0x1A77C) == 0x7C074000 and img.u32(0x1A788) == 0x7D074378,
+          "bank-B rich request = min(full-load 0x5B891A, protection 0x5B9C2C)")
+    check(dform(img, 0x1A6CC) == (11, 0, 4, 0x1000) and img.u32(0x1A6D4) == 0x7C044800
+          and touched(0x5B96B4, 0x1A6E0, "W") and touched(0x5B96B4, 0x1A6EC, "W") and touched(0x5B96B4, 0x1A6F8, "W"),
+          "0x5B96B4 = base request if rich request == 0x1000, else min(rich request, base request) (richest wins)")
+    check(dform(img, 0x1A814) == (11, 0, 8, 0x1000) and touched(0x5B96A2, 0x1A828, "W") and touched(0x5B96A2, 0x1A840, "W"),
+          "bank-B 0x5B96A2: same min rule with 0x1000 = 'no request'")
+    check(touched(0x5B968C, 0x1A60C) and dform(img, 0x1A610) == (11, 0, 10, 0x1000) and touched(0x3FC03B, 0x1A630, "W")
+          and touched(0x5B969C, 0x1A6C8) and touched(0x5B8D1E, 0x1A654) and touched(0x5B96A0, 0x1A688),
+          "base request bank A: excitation 0x5B8D1E / purge-bank 0x5B96A0 / warm-up 0x5B968C (if != 1.0) / diagnostic 0x5B969C")
+    # coordinator INT 0x5563C
+    check(touched(0x3FBFFE, 0x55710) and touched(0x3FBFFF, 0x55718) and touched(0x5B891E, 0x5573C)
+          and touched(0x5B891E, 0x55874) and touched(0x5B96B2, 0x55744, "W") and touched(0x5B96B0, 0x5587C, "W"),
+          "cut setpoint 0x5B891E replaces the base setpoint of BOTH banks (0x5B96B2/0x5B96B0) if either bank flag is set")
+    check(touched(0x5B891C, 0x55760) and touched(0x3FC036, 0x55788, "W") and touched(0x5B891D, 0x55794)
+          and touched(0x5B96A6, 0x557B8, "W") and touched(0x5B96A4, 0x558E4, "W"),
+          "setpoint clamped to [0x5B891C<<5, 0x5B891D<<5] -> feed-forward setpoints 0x5B96A6 / 0x5B96A4")
+    # fuel: per-bank feed-forward divisor and controller factor
+    check(touched(0x5B96A6, 0x2EB70) and any(p == 0x2EB74 and t2 == 0x15E58 for p, t2, r in calls) and touched(0x5B98B0, 0x2EB80)
+          and touched(0x5B96BE, 0x2EBD4) and touched(0x5B96A4, 0x2ECAC) and touched(0x5B98A0, 0x2ECBC) and touched(0x5B96BA, 0x2ED08),
+          "fuel INT 0x2E9E4: path A load/0x5B96A6 x 0x5B98B0 x 0x5B96BE; path B load/0x5B96A4 x 0x5B98A0 x 0x5B96BA")
+    # codeword CAL 0x1C947C
+    check(is_r2_ref(img, 0x58F78, 0x1C947C) and img.u32(0x58F7C) == 0x558C07FE and touched(0x3FC1EE, 0x58F9C, "W")
+          and is_r2_ref(img, 0x58FE0, 0x1C947C) and img.u32(0x58FE4) == 0x558C07BC and touched(0x3FC1EF, 0x5906C, "W"),
+          "CAL 0x1C947C bit0 / bit1 are required for lambda release 0x3FC1EE (bank A) / 0x3FC1EF (bank B)")
+    check(is_r2_ref(img, 0x570F4, 0x1C947C) and img.u32(0x570F8) == 0x558C077A and img.u32(0x57100) == 0x4082000C
+          and dform(img, 0x5710C) == (14, 30, 0, 1) and touched(0x3FC1E3, 0x57118, "W"),
+          "CAL 0x1C947C bit2 forces 0x3FC1E3 = 1 regardless of release/setpoint conditions (stock 0x1B: bit2 clear)")
+    check(touched(0x3FC1E3, 0x57D88) and touched(0x5B98AA, 0x57D9C) and touched(0x5B98B0, 0x57DD0, "W")
+          and touched(0x3FC1E4, 0x57E78, "W") and touched(0x5B9896, 0x57F10) and touched(0x5B98A0, 0x57F4C, "W"),
+          "0x3FC1E3/0x3FC1E4 only gate adding the modulation term to the factor (0x5B98AA->0x5B98B0, 0x5B98A2->0x5B98A0)")
+    check(is_r2_ref(img, 0x590F8, 0x1C947C) and img.u32(0x590FC) == 0x556B0738 and is_r2_ref(img, 0x59110, 0x1C9986)
+          and touched(0x5B96A8, 0x59120) and touched(0x3FC1F2, 0x59138, "W") and touched(0x3FC1F2, 0x57058)
+          and img.u32(0x57068) == 0x558C0738 and touched(0x3FC1D7, 0x57088, "W"),
+          "CAL 0x1C947C bit3: setpoint < CAL 0x1C9986 (lambda 0.90) -> 0x3FC1F2 -> integrator reset 0x3FC1D7 (edge unless bit6)")
+    check(touched(0x5B96AA, 0x590A0) and is_r2_ref(img, 0x590A4, 0x1C9986) and touched(0x3FC1E7, 0x590B8, "W")
+          and img.u16(0x1C9986) == 0x0E67,
+          "adaptation enable 0x3FC1E7 requires release and setpoint 0x5B96AA >= CAL 0x1C9986 (0x0E67 = lambda 0.90); no upper bound")
+    check(touched(0x5B970A, 0x5716C) and touched(0x5B96A6, 0x57280) and any(p == 0x5728C and t2 == 0x16154 for p, t2, r in calls)
+          and img.u32(0x57360) == 0x7E7BE850 and any(p == 0x57398 and t2 == 0x1DDE0 for p, t2, r in calls),
+          "controller error = (measured' - delayed feed-forward setpoint 0x5B96A6) / setpoint (bank A uses measured 0x5B970A)")
+    # requests
+    check(call_with(0xF7E26C, 0x16AE4, 0x1CE1D8) and touched(0x5B8F26, 0xF7E244) and call_with(0xF7E298, 0x179E8, 0x1CE1BC)
+          and touched(0x5B891A, 0xF7E2F8, "W"),
+          "full-load request 0x5B891A = min(curve 0x1CE1D8(rpm) if full-load flag 0x5B8F26, map 0x1CE1BC(rpm, load)) x32")
+    check(touched(0x5B891A, 0xF7C75C) and call_with(0xF7C748, 0x16CD4, 0x1C5720) and touched(0x5B9C2E, 0xF7C82C, "W")
+          and dform(img, 0xF7C870) == (14, 26, 0, 0x1000),
+          "protection request 0x5B9C2E = blend of 0x5B891A toward protection target with weight curve 0x1C5720; 0x1000 when inactive")
+    check(touched(0x5B9307, 0xF48E8C) and touched(0x5B9F74, 0xF48EA0, "W") and touched(0x5B9F74, 0xF7E5E8)
+          and touched(0x5B891C, 0xF7E61C, "W") and touched(0x5B891D, 0xF7E574, "W"),
+          "rich/lean limits 0x5B891C/0x5B891D: curves 0x1CE20C/0x1CE21C on engine-temperature axis index 0x5B9F74")
+    # ===== final pass: overrun / generator =====
+    # --- DFCO / overrun state machine (topic dfco_generator) -------------------
+    check(touched(0x3FC162, 0xFAE51C, "addr") and dform(img, 0xFAE918) == (38, 12, 30, 0)
+          and dform(img, 0xFAE928) == (38, 12, 30, 0) and touched(0x3FC060, 0xFAE904, "R"),
+          "DFCO request 0x3FC162 written by EXT 0xFAE33C (stb via r30 at 0xFAE918/0xFAE928; bit6/bit7 of 0x3FB351 selected by 0x3FC060)")
+    check(call_with(0xF57F98, 0x191B0, 0x1CEFD0) and call_with(0xF57FB8, 0x191B0, 0x1CEFF8)
+          and touched(0x3FB355, 0xF57FA0, "W") and touched(0x3FB35B, 0xF57FC0, "W")
+          and touched(0x3FB355, 0xFAE8B8, "R") and touched(0x3FB354, 0xFAE8BC, "W"),
+          "DFCO entry delays: byte maps 0x1CEFD0/0x1CEFF8 -> reload values 0x3FB355/0x3FB35B of counters 0x3FB354/0x3FB35A")
+    check(touched(0x5B9EE8, 0x5C218, "W") and call_with(0x5C214, 0x196C8, 0x1C1240)
+          and call_with(0xF48DFC, 0x196C8, 0x1CC458) and touched(0x5B9307, 0xF48DEC, "R"),
+          "DFCO delay-map axes: 0x5B9EE8 = rpm byte on axis 0x1C1240, 0x5B9F50 = engine temperature 0x5B9307 on axis 0x1CC458")
+    check(is_r2_ref(img, 0xFAE370, 0x1C7434) and touched(0x5B9285, 0xFAE378, "R") and touched(0x5B93B8, 0xFAE38C, "R")
+          and touched(0x5B93B6, 0xFAE6A4, "W") and touched(0x5B9001, 0xFAE6AC, "R"),
+          "DFCO rpm thresholds: resume 0x5B93B7 = 0x5B93B8 + curve 0x1C7434(0x5B9285); entry 0x5B93B6 compared with rpm byte 0x5B9001")
+    check(touched(0x5B93B8, 0xF410CC, "W") and touched(0x1CF020, 0xF41024, "addr") and touched(0x1CF028, 0xF41050, "addr")
+          and touched(0x5B903C, 0xF41088, "R") and touched(0x1CF03C, 0xF40FF0, "addr") and touched(0x3FB351, 0xF40FC4, "W"),
+          "EXT 0xF40F80: base resume threshold 0x5B93B8 = blend of 0x1CF020/0x1CF028 by 0x5B903C; after-start delay 0x1CF03C sets 0x3FB351 bit0")
+    check(touched(0x3FC18B, 0x464B0, "addr") and is_r2_ref(img, 0x46468, 0x1C8910) and is_r2_ref(img, 0x46488, 0x1C890E)
+          and touched(0x5B9812, 0x46454, "W") and img.u16(0x1C8910) == 164 and img.u16(0x1C890E) == 328,
+          "pedal-released flag 0x3FC18B (INT 0x46348): request 0x5B9812 with hysteresis 0x1C8910/0x1C890E (164/328)")
+    check(touched(0x3FC19F, 0x48634, "addr") and touched(0x3FC162, 0x48650, "R") and touched(0x3FC198, 0x48660, "R")
+          and touched(0x3FBEB8, 0x48670, "R") and touched(0x3FC19E, 0x48680, "R") and is_r2_ref(img, 0x4863C, 0x1C8A18),
+          "full cut 0x3FC19F = 0x3FC162 && !0x3FC198 && !0x3FBEB8 && !0x3FC19E when CAL 0x1C8A18 bit1 = 0")
+    check(img.u8(0x1C8A18) & 2 == 0 and is_r2_ref(img, 0x488BC, 0x1C8A18) and touched(0x3FC162, 0x488B0, "R"),
+          "staged (AEVAB step) overrun reduction via 0x3FC162 exists but is disabled: CAL 0x1C8A18 bit1 = 0")
+    check(touched(0x3FC19F, 0x46C40, "R") and touched(0x1CF3E4, 0x46C58, "addr") and touched(0x3FB451, 0x46C84, "W")
+          and touched(0x3FC18E, 0x46D80, "W") and is_r2_ref(img, 0x46DF0, 0x1C8944),
+          "post-cut window: 0x3FC19F loads 0x3FB451 from 0x1CF3E4; window flag 0x3FC18E selects filter constants 0x1C8944/0x1C8536")
+    check(touched(0x5B90BB, 0x3D2E0, "W") and dform(img, 0x3D2C0) == (14, 10, 0, 0xA0) and touched(0x5B9D1C, 0x3D058, "R")
+          and touched(0x5B9D1C, 0x3D014, "W") and touched(0x1C6F18, 0x3D008, "R"),
+          "0x5B90BB = processed frequency-input speed 0x5B9D20 / 160 (INT 0x3D03C); raw 0x5B9D1C = K / period (INT 0x3CF9C)")
+    check(touched(0x5B9001, 0x59990, "W") and dform(img, 0x59988) == (14, 10, 0, 0xA0)
+          and dform(img, 0x59994) == (14, 12, 0, 0x28) and touched(0x5B9002, 0x599B4, "W"),
+          "rpm bytes: 0x5B9001 = 0x5B9A26/160 (40 rpm/bit), 0x5B9002 = min(0x5B9A26/40, 255) (10 rpm/bit)")
+    # --- generator / BSD ----------------------------------------------------------
+    check(call_with(0xF3C258, 0x63660, 0x28) and touched(0x5B8F7B, 0xF3C298, "W") and touched(0x5B8F7B, 0xF8AB10, "R")
+          and dform(img, 0xF8AB1C) == (14, 4, 12, 0x1A8) and dform(img, 0xF8ABF0) == (7, 31, 5, 0x19),
+          "CAN 0x334 byte0 (signal 0x28) -> 0x5B8F7B; voltage request = max(10600 + 25*0x5B8F7B, base) in EXT 0xF8A9D0")
+    check(is_r2_ref(img, 0xF8ABBC, 0x1C9446) and is_r2_ref(img, 0xF8ABC4, 0x1C9444) and touched(0x5B90BB, 0xF8ABB0, "R")
+          and img.u16(0x1C9444) == 11200 and img.u16(0x1C9446) == 10600,
+          "generator relief request: 0x1C9446 (10600) when 0x5B90BB = 0 else 0x1C9444 (11200)")
+    check(touched(0x5B90F8, 0xF8AD9C, "W") and dform(img, 0xF8AD74) == (14, 12, 0, 100)
+          and dform(img, 0xF8AD7C) == (14, 6, 12, -0x6A) and is_r2_ref(img, 0xF8AD5C, 0x1C943C),
+          "generator setpoint byte 0x5B90F8 = min(request, 0x1C943C)/100 - 106 (0.1 V/bit, 10.6 V offset)")
+    check(touched(0x5B90F8, 0xFA4110, "R") and touched(0x5B90ED, 0xFA4118, "R") and img.u32(0xFA41D4) == 0x57EA3632
+          and dform(img, 0xFA41F8) == (15, 10, 0, 7) and dform(img, 0xFA41FC) == (14, 10, 10, -0x3204),
+          "BSD frame (EXT 0xFA3DB8): 6-bit setpoint from 0x5B90F8 | 2-bit field from 0x5B90ED << 6, sent via INT 0x6CDFC")
+    check(img.u32(0x1C3C4) == 0x304000 and img.u8(0x1C3C4 + 0xC) == 14 and img.u8(0x1C3C4 + 0xD) == 13
+          and dform(img, 0xFEA3AC) == (15, 11, 0, 2) and dform(img, 0xFEA3B0) == (14, 11, 11, -0x3C3C)
+          and dform(img, 0xFEA650) == (34, 4, 30, 0xC) and dform(img, 0xFEA670) == (34, 4, 30, 0xD),
+          "BSD service descriptor INT 0x1C3C4: TPU3 A base 0x304000, channels 14 and 13")
+    check(dform(img, 0x2061C) == (11, 0, 12, 6) and touched(0x5B89F1, 0x2066C, "W") and touched(0x5B89EA, 0x2073C, "W")
+          and is_r2_ref(img, 0x20700, 0x1C6EC3),
+          "BSD receive decoder INT 0x205A4 (node 6): msg0 echo -> 0x5B89F1, msg2 bits0-4 x CAL 0x1C6EC3 -> load 0x5B89EA")
+    check(call_with(0xF8A52C, 0x179E8, 0x1C8FAC) and call_with(0xF8A4F4, 0x179E8, 0x1C8FF8)
+          and call_with(0xF8A510, 0x179E8, 0x1C9044) and touched(0x5B89EA, 0xF8A524, "R") and touched(0x5B8C2A, 0xF8A544, "W"),
+          "generator torque maps 0x1C8FAC/0x1C8FF8/0x1C9044 (variant 0x3FE19C) indexed by BSD load 0x5B89EA -> 0x5B8C2A")
+    check(touched(0x5B8C4A, 0x5AC74, "W") and touched(0x5B8C4A, 0xF59F08, "R") and touched(0x3FB3BA, 0xF59F4C, "W")
+          and touched(0x5B90E3, 0xFB102C, "R") and touched(0x5B97AE, 0xFB1174, "W"),
+          "generator torque 0x5B8C4A (INT 0x5A620) -> 0x3FB3BA (EXT 0xF59E80) -> idle torque reserve 0x5B97AE (EXT 0xFB0F10)")
+    # ===== final pass: PWM, fan, thermostat, exhaust flap =====
+    # --- round 6: PWM channel roles, electric fan, thermostat heater, flap polarity ----------
+    # (snippet for main() of tools/verify_770b_findings.py; uses refs/calls/touched/call_with/dform/is_r2_ref)
+    pwm_rec = lambda ch: 0x156AC + 24 * ch  # noqa: E731
+    check([img.u8(pwm_rec(c) + 7) for c in range(10)] == [0x12, 0x00, 0x0C, 0x1E, 0x13, 0x11, 0x1F, 0x0B, 0x01, 0x03]
+          and [img.u8(pwm_rec(c) + 0xD) for c in range(10)] == [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+          "PWM table INT 0x156AC: hw channel (+4) and driver index (+0xD) of logical channels 0..9")
+    check(img.u32(0x671D8) == 0x80670008 and img.u32(0x67268) == 0x7CC361D6 and img.u32(0x672F8) == 0x21842710,
+          "PWM API INT 0x671AC: period = rec+8 multiplier x r5; duty inverted (10000-duty) when rec+0x13 set")
+    fan_out = (0xF2D78C, 0xF578D8, 0xFB2784)
+    check(all(dform(img, f + 0x38) == (14, 3, 0, 9) and any(p == f + 0x3C and t == 0x671AC for p, t, r in calls)
+              and touched(0x5B9470, f + 0x10) and touched(0x5B946F, f + 0x28) and img.u32(f + 0x14) == 0x1D8C2710
+              for f in fan_out),
+          "PWM logical ch 9 (electric fan): duty = 0x5B9470*10000/255, period factor = 10000/0x5B946F (3 copies)")
+    check(dform(img, 0xF5A62C) == (14, 11, 0, 10) and dform(img, 0xF5A63C) == (14, 11, 0, 100)
+          and touched(0x5B946F, 0xF5A630, "W") and touched(0x5B946F, 0xF5A640, "W"),
+          "fan PWM frequency byte 0x5B946F = 10 (after-run flag 0x3FC2A8) else 100 -> 100 ms / 10 ms period")
+    check(call_with(0xF5A5DC, 0x16AE4, 0x1D09B8) and touched(0x5B9472, 0xF5A5D8) and touched(0x5BBAC9, 0xF5A5F0)
+          and touched(0x5B9470, 0xF5A618, "W"),
+          "fan duty 0x5B9470 = curve 0x1D09B8(0x5B9472) clamped to [0x5BBAC9, CAL 0x1D09B6]")
+    check(call_with(0xF5A7D0, 0x16AE4, 0x1D09CC) and touched(0x5B9308, 0xF5A7CC)
+          and call_with(0xF5A7B8, 0x16AE4, 0x1D0988) and call_with(0xF5A7A0, 0x16AE4, 0x1D09A0) and touched(0x5B854A, 0xF5A74C),
+          "fan request: max(curve 0x1D09CC(coolant temp 2 0x5B9308), curves 0x1D0988/0x1D09A0(IHKA request 0x5B854A))")
+    check(call_with(0xF5A854, 0x179E8, 0x1D0958) and touched(0x5B9229, 0xF5A82C) and touched(0x5B9477, 0xF5A830, "W")
+          and call_with(0xF5A89C, 0x16AE4, 0x1D0940) and touched(0x5B90BB, 0xF5A674),
+          "fan request adds map 0x1D0958(transmission oil temp 0x5B9229, 0x5B90BB) and is scaled by curve 0x1D0940(0x5B90BB)")
+    check(msgs[3]["can_id"] == 0x1B5 and not msgs[3]["tx"] and dform(img, 0xF3BE98) == (14, 3, 0, 3)
+          and touched(0x5B854A, 0xF3BF4C, "W") and img.u32(0xF3BF3C) == 0x5464073E,
+          "0x5B854A = low nibble of byte 3 of CAN 0x1B5 (message object 3, read via INT 0x63730)")
+    check(touched(0x3FC2A8, 0xFB3898, "W") and touched(0x5B9307, 0xFB3874) and touched(0x1D09E2, 0xFB387C)
+          and touched(0x5B9474, 0xFB38D4, "W") and any(p == 0xFB38E8 and t == 0xF5A53C for p, t, r in calls),
+          "fan after-run EXT 0xFB37D0: 10 Hz flag 0x3FC2A8 / duty 0x5B9474 from engine temp 0x5B9307 > CAL 0x1D09E2")
+    check(dform(img, 0xF2C9E0) == (14, 3, 0, 8) and touched(0x5B9C12, 0xF2C9DC) and touched(0x5B9052, 0xF2C9D0)
+          and is_r2_ref(img, 0xF7BE6C, 0x1C5480) and is_r2_ref(img, 0xF7BEB0, 0x1C5484) and is_r2_ref(img, 0xF7BEB8, 0x1C5482)
+          and touched(0x5B9C12, 0xF7BEC8, "W"),
+          "PWM logical ch 8: duty 0x5B9C12 chosen from fixed CAL duties 0x1C5480/82/84 (EXT 0xF7BDC0), period CAL 0x1C5486")
+    check(touched(0x5B9307, 0xF9E5C0) and touched(0x5B91D3, 0xF9E5C8) and touched(0x3FC29B, 0xF9E624, "W")
+          and touched(0x1D0938, 0xF9E630) and touched(0x5B8E26, 0xF9E634, "W") and touched(0x1D08A5, 0xF9E608),
+          "ch-6 command 0x3FC29B: on when engine temp 0x5B9307 > target 0x5B91D3 (+hyst CAL 0x1D08A5), min-on time CAL 0x1D0938")
+    check(img.u32(0xAC1C) == 0x2C040000 and img.u32(0xAC24) == 0x7FEC0034 and dform(img, 0x38C18) == (14, 4, 0, 1),
+          "digital output driver INT 0xAC00 inverts the value when r4 != 0; flap channel 12 is called with r4 = 1")
+    check(touched(0x5B90BB, 0xF97EAC) and touched(0x1D07EC, 0xF97EB4) and img.u32(0xF97EC4) == 0x558CF6BE
+          and touched(0x5B953E, 0xF97E30) and touched(0x1D07E6, 0xF97E38),
+          "flap: 0x5B90BB <= CAL 0x1D07EC selects CW bit2; start gate compares 0x5B953E with CAL 0x1D07E6")
+    check(dform(img, 0x3D2C0) == (14, 10, 0, 0xA0) and touched(0x5B90BB, 0x3D2E0, "W") and touched(0x5B90BB, 0x3D2A8, "W")
+          and any(p == 0x3CFD0 and t == 0x66DD4 for p, t, r in calls) and touched(0x5B9D1C, 0x3D014, "W"),
+          "0x5B90BB = filtered 0x5B9D20/160 (0 on timeout); source 0x5B9D1C = K/(10*period) from period capture INT 0x66DD4")
+    check(touched(0x3FBFB7, 0x3B934, "W") and call_with(0x3B90C, 0x16AE4, 0x1CCCA0) and touched(0x5B9001, 0x3B914)
+          and touched(0x5B953E, 0x3B8CC, "W"),
+          "0x3FBFB7 set when rpm byte > curve 0x1CCCA0(engine temp); 0x5B953E counts while 0x3FBFB7 set")
 
     for ok, text in results:
         print(f"[{'PASS' if ok else 'FAIL'}] {text}")

@@ -1,152 +1,121 @@
-# Research status
+# Research status — final static pass
 
-Last update: 2026-10-03 (static-analysis round 6, 0x1A2 speed / ratio path).
+Last update: 2026-10-03 (final static-analysis pass, round 7). Target: BMW E65 735i, N62B36, Bosch ME9.2
+DME HW 0 261 209 002, SW 1037389760, family 0087180A770B. Read-only analysis; no patches.
 
-## Confidence model
+Verification: `tools/verify_770b_findings.py` runs **195 checks, all pass** on the reference dumps
+(31 round 2 + 16 round 3 + 15 round 4 + 10 round 5 + 12 round 6 + 111 final pass).
 
-- **CONFIRMED** — reproduced directly from the provided binary/reference files or unambiguous code/data; round-2 items are re-checked by `tools/verify_770b_findings.py`.
-- **HIGH CONFIDENCE** — two independent lines of evidence (e.g. 770B code semantics + 560B XDF description/order), where one line depends on a reference not re-verified in the current round.
-- **LIKELY** — strongly supported by code structure, table geometry or local alignment, but not proven end-to-end.
-- **HYPOTHESIS** — plausible interpretation awaiting validation.
-- **REJECTED** — tested and contradicted by evidence.
-- **UNTESTED** — proposed calibration/behaviour not yet run on a vehicle.
+Confidence model: **CONFIRMED** (code/data, mostly re-checked by the verifier) · **HIGH CONFIDENCE** (two
+independent lines) · **LIKELY** · **HYPOTHESIS** · **REJECTED** · **UNTESTED** · **NOT COMPLETED**.
+Address types: INT / EXT / CAL / FILE / RAM / IO (see `docs/FINAL_TECHNICAL_REPORT.md` §2).
 
-## Current status summary
+Overview: [`docs/SYSTEM_FLOW.md`](docs/SYSTEM_FLOW.md) · Report: [`docs/FINAL_TECHNICAL_REPORT.md`](docs/FINAL_TECHNICAL_REPORT.md)
 
-| Item | Status | Notes |
+## CONFIRMED
+
+| Area | Finding | Note |
 |---|---|---|
-| Target external flash is 1 MiB | CONFIRMED | `28f200f3t.bin` is 1,048,576 bytes |
-| Bosch HW `0261209002` | CONFIRMED | dump metadata/string data and source label |
-| Bosch SW `1037389760` / 770B family | CONFIRMED | present in external flash |
-| Reference listing vs physical DME part-number mismatch | CONFIRMED | archive title and label differ |
-| MPC555 memory map (internal flash at 0, ext flash at `0xF00000`, SRAM `0x3F9800`, ext RAM `0x5B8000`, peripherals) | CONFIRMED | `research/verified-findings.md` § Memory architecture |
-| Calibration read via CPU alias `0x1C0000–0x1DFFFF` (= ext file `CPU − 0x100000`) | CONFIRMED | e.g. REDABM `r2 − 0x2AE0` |
-| Application r13 = `0x401A20`, r2 = `0x1C7FF0` | CONFIRMED | two identical startup sequences |
-| 770B `REDABM` at ext `0xC5510` / CPU `0x1C5510`, used by AEVAB | CONFIRMED | int `0x2C560`, `0x2C6E4` |
-| Four-of-eight patterns `0x55`/`0xAA`; bits = firing-order positions | CONFIRMED | `0x55` = cyl 1,4,6,7; `0xAA` = cyl 5,8,3,2 |
-| Runtime mask selection `REDABM[(segment+4) mod 8][step−1]`, phase latched per event | CONFIRMED | `research/aevab-redabm.md` |
-| Step from torque ratio round(8·(1−target/base)) with hysteresis | CONFIRMED logic | torque signal names LIKELY |
-| 770B `CWEVAB` at ext `0xCD9CA` / CPU `0x1CD9CA` | HIGH CONFIDENCE (function CONFIRMED) | upgraded from LIKELY |
-| `MDHYEZ` at CPU `0x1C8A1A` | HIGH CONFIDENCE | |
-| `KFPED` at CPU `0x1C87DA` | HIGH CONFIDENCE | KFMIMR/KFMRMI LIKELY |
-| Kickdown `B_kd` (`0x3FBFB3`) computed in 770B fn int `0x3B80C`; thresholds `0x1C1E4A/4B/4C` | CONFIRMED fn / HIGH CONFIDENCE names | requires 100 % pedal + detent voltage |
-| Cylinder-cut lambda substitution | CONFIRMED mechanism | LASOABML → `0x1C6408` LIKELY |
-| Exhaust-flap logic and gear×rpm map | CONFIRMED fn | names LIKELY |
-| Two-level coolant target map | LIKELY | scaling HYPOTHESIS |
-| Generator voltage request function | LIKELY | TGENOFVL not located |
-| Ignition maps (24×16 ×3) | LIKELY | roles HYPOTHESIS |
-| VANOS/Valvetronic, knock adaptation, fan/thermostat outputs, full-load/protection enrichment sources | not located | ROADMAP round 4 |
-| Cruise-control set-speed presets in DME | none found | 1 km/h step; breakpoints 30/50/70/100/130/200 km/h |
-| One global 560B → 770B offset | REJECTED | local deltas −0x84 … +0x118 |
-| OEM AEVAB rotates the pattern each cycle | REJECTED | phase latched per event |
-| E-mode can use native kickdown as override trigger | HYPOTHESIS | exists, but stock fires only at full pedal |
-| 4/6 firing can be used for efficiency | HYPOTHESIS | OEM path is torque reduction; triggers cut-lambda substitution |
-| Lean cruise can be implemented cleanly | HYPOTHESIS | setpoint path partly traced (`research/lambda-control.md`) |
-| EGS efficiency gain | HYPOTHESIS | no EGS binary |
+| Identification / memory | HW/SW IDs; internal flash at 0, external flash at `0xF00000`, CAL alias `0x1C0000` = FILE `CPU − 0x100000`; r2 `0x1C7FF0`, r13 `0x401A20` | `verified-findings.md` |
+| AEVAB | REDABM `0x1C5510`, bit order = firing order, phase latched per event, priority total > full > diagnostic masks > step | `aevab-redabm.md` |
+| Torque | KFPED lookup, torque words in 0x0A8/0x0A9/0x0AA, CAN scaling `(T − loss)·36/2048` (scale CAL `0x1C1150`), full fast/slow arbitration (`min` reductions, `max` increases), ignition first then cut | `torque-and-modes.md` |
+| EGS → DME | 0x0B5 torque request decoded from the raw RX buffer (EXT `0xF15450`); EGS path to ignition; EGS never enables cylinder cut; 0x3FBEDD = driver-wish rise limiter; 0x0BA gear, bits 6/7 select misfire-detector maps | `dme-egs-interface.md` |
+| DSC path | 0x0B6 raw decode (DSC identity LIKELY), DSC reduction/MSR increase in the arbitration | `torque-and-modes.md` |
+| Rev limiter | `0x3FC1A3`, 6500 rpm (CAL `0x1C8B2E`), fault limits 1200 / 1200…3640 rpm | `torque-and-modes.md` |
+| Turbine-speed path | `0x5B981E = min((0x5B9982 << 13)/0x5B9A26, 0xFFFF)`; map CAL `0x1C84B0`; tip-in filter gain; no TCC state in the DME | `egs-tcc-shift-state.md` |
+| Valvetronic | one request per bank (CAN 0x105/0x10D), no per-cylinder control; target priority; bank-balance split logic; feedback substitute | `valvetronic.md` |
+| VANOS | 4 actuators, PWM 2/7/3/6, position loops, 14 target maps in two families | `vanos.md` |
+| Ignition | 0.75 °/bit, base/full-load/idle/safety maps, final `min(Z, max(intervention, minimum))`, minimum-angle maps, efficiency table | `ignition-knock-fuel-quality.md` |
+| Knock | per-cylinder retard, recovery, adaptation table 21 × 8, floored at 0 (no octane gain beyond the base map) | `ignition-knock-fuel-quality.md` |
+| Lambda | arbitration INT `0x1A5E4` (richest wins), protection ≥ full-load richness, cut setpoint on both banks, controller factor 0.75–1.25, codeword `0x1C947C` bits | `lambda-control.md` |
+| DFCO | state machine (writer of `0x3FC162` EXT `0xFAE33C`), ramp-out gate, DSC/EGS blocks, no gear dependence in stock data, no generator interaction | `overrun-dfco.md` |
+| Generator | voltage-request chain, BSD frame path, generator torque → idle reserve | `generator-control.md` |
+| Exhaust flap | logic, map CAL `0x1D077C`, output channel 12, kickdown via pedal not flag | `exhaust-flap.md` |
+| Tools | 12 read-only analysis tools + verifier | `tools/README.md` |
 
-## What was verified in round 2
+## HIGH CONFIDENCE
 
-All CONFIRMED rows above (31 automated checks, `tools/verify_770b_findings.py`, 31/31 PASS on the
-reference dump).
+| Finding | Note |
+|---|---|
+| D/S/M drive-program state is **not** maintained by the DME | `dme-egs-interface.md` final pass §4 |
+| VANOS objects 0/2 = intake, 1/3 = exhaust; pairs {0,1}/{2,3} = banks; 0.1 °CA units | `vanos.md` |
+| Valvetronic lift variables in µm | `valvetronic.md` |
+| Electric fan = PWM logical channel 9 (no CAN/LIN path) | `thermal-management.md` |
+| Thermostat heater = digital output channel 6 (promoted from LIKELY) | `thermal-management.md` |
+| Exhaust flap command 1 = closed (logic level) | `exhaust-flap.md` |
+| `0x5B90BB` = vehicle speed (frequency input /160); unit open | `thermal-management.md`, `overrun-dfco.md` |
+| Generator request in mV; TGENOFVL = CAL `0x1C9412` | `generator-control.md` |
+| Transmission oil temperature 0x0B5 byte 7 → `0x5B9229` | `dme-egs-interface.md` |
+| λ 4096 = 1.0; KFPED, CWEVAB, MDHYEZ names; relative charge 4267 = 100 % | `torque-and-modes.md`, `lambda-control.md` |
 
-## What remains speculative
+## LIKELY
 
-Names of RAM variables (Bosch labels), physical scalings, the identity of the intervention sources,
-everything under "not located", and all efficiency/mode proposals.
+| Finding | Note |
+|---|---|
+| 0x1A2 = transmission input / converter turbine speed, 0.125 rpm/bit | `egs-tcc-shift-state.md` |
+| Valvetronic request in 0.1° eccentric-shaft angle | `valvetronic.md` |
+| 0x0B6 = DSC torque-intervention frame | `torque-and-modes.md` |
+| Canister purge = PWM channel 4 | `thermal-management.md` |
+| Catalyst-heating / cold-start coordinator EXT `0xF841E4` | `late-ignition-and-catalyst-heating.md` |
+| Exhaust-temperature model EXT `0xF4C78C` behind the protection lambda | `full-load-enrichment.md` |
+| `0x3FBF34/0x3FBF38` = limp-home / monitoring fault reactions | `torque-and-modes.md` |
+| VANOS and Valvetronic map roles (normal / warm-up / idle / full-load) | `vanos.md`, `valvetronic.md` |
 
+## OPEN (needs live data, EGS firmware or more static work)
 
-## Round 3 status (CAN, modes, kickdown, lambda, generator, flap, thermal, AEVAB integration)
+| Item | Needs |
+|---|---|
+| Nm per bit of torque words (0.5 Nm/bit HYPOTHESIS) | WOT log, EGS firmware or A2L |
+| 0x0BA bits 6/7 meaning and polarity (converter-state HYPOTHESIS) | logs / EGS firmware |
+| 0x0B5 bits 24-35 vs 12-23 (slow vs fast request) | shift logs / EGS firmware |
+| VANOS bank 1 vs bank 2 | tester values or wiring |
+| Vehicle-speed unit (1.25 vs 0.625 km/h per bit) | one log point against GPS |
+| Physical bank of lambda paths A/B | live data |
+| Role of PWM channels 0/1/5/8 and several digital outputs | pin identification |
+| Task rates (counter ticks → seconds) | OS task-table decode |
+| Exhaust-temperature model scale | log against EGT |
+| Shift schedules, lock-up, D/S/M behaviour | EGS firmware |
 
-| Item | Status | Notes |
+## REJECTED
+
+| Assumption | Evidence |
+|---|---|
+| One global 560B → 770B offset | local deltas −0x84 … +0x118 |
+| OEM AEVAB rotates the pattern each cycle | phase latched per event |
+| 0x192 / 0x1D2 received by the DME | not in the message table |
+| "λ ≠ 1.000 switches the bank to open loop" (round 4) | the window gates only λ modulation; release has no setpoint term |
+| 0x0B5 bytes 0-3 unread / no EGS torque value | read from the raw RX buffer by EXT `0xF15450` |
+| `0x3FB460`/`0x3FB45E` = EGS torque limit | previous driver wish + DME step size (rise limiter) |
+| `0x3FBF34`/`0x3FBF38` = DSC | pure fault-flag logic |
+| EXT `0xFAE940` = gear-dependent DFCO thresholds | idle/after-start logic |
+| `0x5B90BB` = temperature (round 3) | vehicle speed |
+| CAL `0x1CB8AC/0x1CB98A/0x1CBA68` = ignition-efficiency maps | minimum-angle maps |
+| 0x1A2 = transmission output speed | single ±6 % ratio axis for all gears |
+| `0x1CF610` = sport pedal map (KFPEDS) | shape argues for cruise path |
+| EXT `0xF36FE8`/`0xF12018` = VANOS; INT `0xA558` = PWM | output-stage test / discrete port |
+
+## NOT COMPLETED
+
+| Item | What is known | Evidence needed |
 |---|---|---|
-| TouCAN driver: message-object table EXT `0xFDFAF4` (30 IDs), signal table EXT `0xFDF967`, read/write API INT `0x63660`/`0x63C3C` | CONFIRMED | `research/can-and-drive-modes.md`, `tools/me9_can.py` |
-| DME TX 0x0A8/0x0A9/0x0AA; RX EGS 0x0B5/0x0BA/0x1A2/0x5C3 (+ 16 other RX IDs, private TouCAN-B bus) | CONFIRMED | matches the E65 reference filter sets |
-| 0x192 (selector) and 0x1D2 received by the DME | REJECTED | not in the message table |
-| Current gear `0x5B92CA` from 0x0BA byte0 nibble via table INT `0x15984` | CONFIRMED | upgraded from LIKELY |
-| D/S/M program state inside the DME | LIKELY absent | no input, no consumer |
-| Sport driver-wish behaviour (KFPEDS-type) in 770B | LIKELY absent | `research/sport-mode.md` |
-| B_kd consumers: only CAN coder (→ 0x0AA byte6 high nibble = 0x0B) and diagnostics | CONFIRMED | `research/kickdown-path.md` |
-| 0x0AA content: rpm (bytes4-5, 0.25 rpm/bit), pedal byte3, kickdown state byte6 | CONFIRMED | |
-| Transmission oil temperature from 0x0B5 byte7 → `0x5B9229` | HIGH CONFIDENCE | exact unit conversion |
-| EGS driver-wish limit `0x3FBEDD` (0x0B5 byte5 bits6-7) | LIKELY | |
-| Turbine-speed candidate 0x1A2 → `0x5B9982` | LIKELY | round 6: output speed REJECTED, see below |
-| λ scale 4096 = 1.0 (sensor curve `0x1C6D0A`) | HIGH CONFIDENCE | upgraded |
-| Fuel feed-forward divides by λ setpoint; controller factor `0x5B98A0` | CONFIRMED structure | round 4: a target ≠ 1.000 switches the bank to open loop (see below) |
-| TGENOFVL → `0x1C9412` (full-load-edge generator timer, stock 0) | HIGH CONFIDENCE (round 4) | full chain to the voltage request traced |
-| Flap command `0x3FC286` → output channel 12 | CONFIRMED | polarity LIKELY "on = closed" |
-| `0x5B90BB` = vehicle speed (round 2) | REJECTED as stated; now HYPOTHESIS temperature | |
-| Least-invasive efficiency-request point: `max()` at AEVAB entry INT `0x2C088`, gated off during any OEM intervention | analysis (HYPOTHESIS) | `research/aevab-integration-points.md` |
-| Continuous 4/8 via injector cut keeps unfired cylinders pumping air (lean exhaust, NOx/cat risk) | engineering constraint | must be evaluated before any efficiency claim |
+| Knock signal evaluation internals | acquisition and retard logic CONFIRMED | knock IC identification |
+| Lambda adaptation learning internals (EXT `0xF54F18`) | enable conditions CONFIRMED | further static work |
+| Valvetronic throttle backup path | fault lift modes known | throttle actuator driver (H-bridge API INT `0x6734C` candidate) |
+| Secondary air / exhaust-heating lambda | not found in request paths | further static work |
+| Misfire reaction path end-to-end | detector and counters located | trace to fault/diagnostic cut |
+| Output-stage diagnostic IDs | fault flag entry points known | further static work |
+| EEPROM persistence of adaptation tables | NV-mirror region | further static work |
 
-Verification: `tools/verify_770b_findings.py` now runs 47 checks (31 round-2 + 16 round-3); all pass on the reference dump.
+## Conceptual work (not findings)
 
-
-## Round 4 status (cylinder-cut lambda, Valvetronic, torque CAN, outputs)
-
-| Item | Status | Notes |
-|---|---|---|
-| Closed loop suspended on a bank with any cut; integrators reset; feed-forward at cut setpoint | CONFIRMED | `research/cylinder-cut-lambda.md` |
-| Closed loop requires snapped setpoint within ±1 of 0x1000 (unless CAL `0x1C947C` bit2) | CONFIRMED | corrects the round-3 "lean target is clean" reading |
-| IMLEVABS → CAL `0x1C99C2` (+ bank-B `0x1C99C4`, post-overrun `0x1C99C6`) | HIGH CONFIDENCE | air-mass integral restart on cut |
-| Adaptation inhibited during cut (enables depend on release) | LIKELY | learning EXT `0xF54F18` |
-| No compensation for oxygen from unfired cylinders | CONFIRMED (no path) | feedback is suspended instead |
-| Forcing closed loop during sustained skip-fire would enrich active cylinders (factor limit 1.25) | HYPOTHESIS (consequence) | |
-| Valvetronic: DME sends one lift request per bank on private CAN 0x105/0x10D | CONFIRMED (DME side) | no per-cylinder lift; `research/valvetronic.md` |
-| Valvetronic target maps (main `0x1C47E8` etc.) | LIKELY / HYPOTHESIS roles | |
-| VANOS | located in round 5 (see below) | `research/vanos.md` |
-| Knock / fuel-quality adaptation | not located | `research/ignition-knock-fuel-quality.md` |
-| Full-load λ request `0x5B891A` (KFLAMFA candidate `0x1CE1BC`), component protection `0x5B9C2E` | LIKELY / HYPOTHESIS | `research/full-load-enrichment.md` |
-| 0x0A8/0x0A9 torque fields (positions), converter formula | CONFIRMED positions; names LIKELY/HYPOTHESIS | `research/dme-egs-interface.md` |
-| Output stage: channel 6 = thermostat heater (LIKELY), 4 = purge (LIKELY), 12 = flap (CONFIRMED) | mixed | `research/thermal-management.md` |
-| INT `0xAB88` channels 0–11 are digital inputs, not PWM | CONFIRMED (correction) | |
-| DFCO: gear-dependent overrun logic EXT `0xFAE33C`/`0xFAE940` | LIKELY (partial) | `research/overrun-dfco.md` |
-| Sustained 4/8 or 6/8 firing density as an efficiency measure | not supported by OEM lambda/valve design; benefit doubtful | `research/firing-density-feasibility.md` |
-
-Verification: 62 checks (31 + 16 + 15), all pass on the reference dump.
-
-
-## Round 5 status (VANOS only)
-
-| Item | Status | Notes |
-|---|---|---|
-| PWM API INT `0x671AC` + logical table INT `0x156AC` (10 channels) | CONFIRMED | |
-| VANOS subsystem: 4 actuators on PWM logical 2/7/3/6 (MIOS hw 0x0C/0x0B/0x1E/0x1F), main loop INT `0x3FBAC`, objects INT `0x1BC9C` | CONFIRMED structure, name HIGH CONFIDENCE | |
-| Position loop: target `+0x30`, measured `+0x2C`, extrapolated `+0x38`, duty `+0x10` per object | CONFIRMED | |
-| Two actuator types × two instances (objects 0/2 vs 1/3) | CONFIRMED structure | intake/exhaust and bank assignment open |
-| Targets from two families of seven 12×12 maps (CAL `0x1C9B9C…0x1CA2EC`), rpm × load group axes | CONFIRMED lookups; roles HYPOTHESIS | |
-| Cam angles `0x5B9C94…0x5B9C9A` from INT `0x2F7AC…0x30010`; TPU A ch 9–12 edge capture | CONFIRMED / LIKELY (link) | |
-| EXT `0xF36FE8`/`0xF12018` as VANOS | REJECTED | output-stage test |
-| INT `0xA558` as PWM | REJECTED | discrete port fields |
-
-Verification: 72 checks (62 + 10), all pass.
-
-## Round 6 status (0x1A2 speed / ratio path only)
-
-| Item | Status | Notes |
-|---|---|---|
-| 0x1A2 decode: raw → `0x5B9982`, 0xFFFF → 0, timeout (> 50 calls without RX indication `0x3FA58C`) → 0 | CONFIRMED | `research/egs-tcc-shift-state.md` §1 |
-| `0x5B981E = min((0x5B9982 << 13) / 0x5B9A26, 0xFFFF)`, rpm 0 → 0xFFFF/0 | CONFIRMED | numerator selector CAL `0x1C8532` bit 0x02 (= 0x0E) |
-| Ratio scale 0x4000 = 1.0, 0x1A2 = 0.125 rpm/bit | LIKELY | from the map axis 0.90…1.06 × 0x4000 |
-| Map CAL `0x1C84B0` 6×8 (ratio × gear), helper INT `0x17B64`, output 0x8000 = ×1 | CONFIRMED geometry/values/scaling | role HYPOTHESIS name |
-| `0x5B97F0` divides the gain `0x5B982A` of a second-order low-pass on the torque request (`0x5B9808` → `0x5B97F8`) | CONFIRMED | second divisor path (bit 0x10) and INT `0x5F52C` reader inactive in this calibration |
-| Filtered request used while positive-step latch `0x3FC18D` is set ("tip-in shaping") | CONFIRMED mechanism / LIKELY name | |
-| 0x1A2 = transmission input / converter turbine speed | LIKELY | output speed REJECTED (single ±6 % ratio axis for all gears) |
-| TCC lock / slip state in the DME | CONFIRMED absent | no threshold, flag or derivative on the ratio; lock meaning of 1.00–1.04 zone HYPOTHESIS |
-
-Verification: 84 checks (72 + 12), all pass.
-
-## Round-2 input limitation
-
-The third-party 560B bin/XDF and 725D A2L were not re-opened in round 2. 560B-based names rely on
-the offsets/descriptions recorded in round 1 (`research/reference-symbols.csv`).
+[final-mode-architecture](research/final-mode-architecture.md) · [protection-priority](research/protection-priority.md) ·
+[efficiency-budget](research/efficiency-budget.md) · [performance-mode](research/performance-mode.md) ·
+[late-ignition-and-catalyst-heating](research/late-ignition-and-catalyst-heating.md) ·
+[in-car-validation-plan](research/in-car-validation-plan.md) · [development-methodology](research/development-methodology.md)
 
 ## Important architectural caution
 
-`REDABM`/AEVAB is an OEM torque-reduction mechanism, not an OEM fuel-economy cylinder-deactivation feature. Reusing it for efficiency requires preserving demanded wheel torque by changing load/torque control on the firing events that remain active. Simply forcing a reduction step is not the same thing as an efficient V4/V6 mode. Round 2 adds two facts: the OEM pattern does not rotate during a steady event, and any cut switches the lambda setpoint to the cylinder-cut curve.
-
-## Research notes index
-
-`research/verified-findings.md`, `research/symbol-map-770B.csv`, `research/560B-to-770B-mapping.md`,
-`research/aevab-redabm.md`, `research/lambda-control.md`, `research/torque-and-modes.md`,
-`research/generator-control.md`, `research/exhaust-flap.md`, `research/thermal-management.md`,
-`research/ignition-vanos-valvetronic.md`, `research/egs-integration-plan.md`, `research/can-and-drive-modes.md`, `research/sport-mode.md`, `research/kickdown-path.md`, `research/dme-egs-interface.md`, `research/aevab-integration-points.md`, `research/cylinder-cut-lambda.md`, `research/valvetronic.md`, `research/vanos.md`, `research/ignition-knock-fuel-quality.md`, `research/full-load-enrichment.md`, `research/overrun-dfco.md`, `research/firing-density-feasibility.md`, `research/egs-tcc-shift-state.md`.
+`REDABM`/AEVAB is an OEM torque-reduction mechanism, not an OEM fuel-economy cylinder-deactivation
+feature. The N62 has no valve deactivation: unfired cylinders keep pumping air, and lambda feedback is
+suspended on a cut bank. The efficiency concept therefore keeps all 8 cylinders firing; a cylinder-cut
+mode remains an optional, last-stage experiment.

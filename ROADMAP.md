@@ -1,123 +1,69 @@
-# Roadmap
+# Roadmap — after the final static pass
 
-## Phase 0 — Evidence discipline
+The DME binary alone answers *how the OEM logic works*. It cannot answer physical units that are only
+defined outside the binary, what the EGS does, or whether a change is beneficial. This roadmap separates
+those four kinds of work. Status per item: [`RESEARCH_STATUS.md`](RESEARCH_STATUS.md).
 
-- [x] Hash all reference inputs.
-- [x] Separate third-party source material from publishable derived research.
-- [x] Define confidence labels: `CONFIRMED`, `LIKELY`, `HYPOTHESIS`, `UNTESTED`.
-- [x] Confirm REDABM 560B -> 770B byte identity.
-- [x] Reproduce provisional RAM/function addresses from disassembly and store scripts/notes (round 2: `tools/me9_*.py`, `tools/verify_770b_findings.py`).
-- [x] Add `HIGH CONFIDENCE` and `REJECTED` labels.
+## 1. STATIC ANALYSIS — COMPLETE / MOSTLY COMPLETE
 
-## Phase 1 — DME map and function port
+- [x] Evidence discipline: hashes, confidence model, no firmware in the repository.
+- [x] Memory map, calibration alias, startup registers (CONFIRMED).
+- [x] AEVAB / REDABM chain and priority (CONFIRMED).
+- [x] Torque structure: driver wish, models, arbitration, ignition-vs-cut split, CAN torque words and scaling ratio (CONFIRMED).
+- [x] DME ↔ EGS CAN: 0x0A8/0x0A9/0x0AA, 0x0BA, 0x0B5 (incl. raw-buffer torque request), 0x1A2, 0x5C3 (CONFIRMED decode).
+- [x] Turbine-speed ratio path and tip-in filter (CONFIRMED).
+- [x] D/S/M absence in the DME (HIGH CONFIDENCE).
+- [x] Valvetronic protocol, target chain, bank balancing (CONFIRMED / HIGH CONFIDENCE units).
+- [x] VANOS structure, units, intake/exhaust and bank pairing (CONFIRMED / HIGH CONFIDENCE).
+- [x] Ignition map structure, final angle, knock control structure (CONFIRMED).
+- [x] Lambda architecture, arbitration, protection lambda, lean-feasibility constraints (CONFIRMED).
+- [x] DFCO state machine (CONFIRMED).
+- [x] Generator request chain and torque model (CONFIRMED / HIGH CONFIDENCE).
+- [x] Fan, thermostat heater, PWM/digital channel roles (HIGH CONFIDENCE where stated).
+- [x] Exhaust flap logic and polarity (CONFIRMED / HIGH CONFIDENCE).
+- [x] Verifier: 195 reproducible checks; tools for xref, CAN, call graph, tables, PWM, dependencies.
+- [~] Remaining static work (not blocking validation): knock-signal internals, lambda adaptation learning,
+      throttle backup path, misfire reaction path, output-stage diagnostic IDs, OS task rates, unknown
+      PWM/digital channels, EEPROM persistence.
+- [ ] Minimal 770B definition containing only CONFIRMED / HIGH CONFIDENCE symbols (from `research/symbol-map-770B.csv`).
 
-- [~] Port selected 560B symbols into the 770B layout (round 2: 10 symbols by semantics/order; byte-signature porting pending a local 560B bin/XDF).
-- [x] Confirm `CWEVAB` target address (CPU `0x1CD9CA`, function confirmed).
-- [x] Locate the `torque ratio -> step request -> AEVAB -> evz_aus/evz_austot -> injector output` chain (`research/aevab-redabm.md`).
-- [~] Document torque, lambda, Valvetronic, VANOS, ignition, generator, thermostat and exhaust-flap control (round 2 notes exist; VANOS/Valvetronic/knock not located).
-- [ ] Create a minimal 770B definition containing only verified symbols (start from `research/symbol-map-770B.csv`, CONFIRMED/HIGH CONFIDENCE rows only).
+## 2. REQUIRES LIVE VEHICLE DATA (read-only logging, `research/in-car-validation-plan.md`)
 
-### Round-3 open questions and next static experiments
+- [ ] Torque Nm per bit (WOT log vs 360 Nm rating).
+- [ ] 0x1A2 unit (ratio ≈ 0x4000 with converter locked) and 0x0BA bits 6/7 behaviour.
+- [ ] Vehicle-speed unit of `0x5B90BB`/`0x5B9D20`.
+- [ ] VANOS bank 1 vs bank 2 (tester values or wiring); confirm intake/exhaust assignment.
+- [ ] Valvetronic request unit and lift scaling vs tester values.
+- [ ] Exhaust-flap physical polarity (bench check at idle).
+- [ ] DFCO thresholds, resume behaviour and timing in seconds.
+- [ ] Catalyst-heating coordinator behaviour after a cold start.
+- [ ] Knock activity on 95 vs 98 RON.
+- [ ] Physical bank of lambda paths A/B; exhaust-temperature model scale.
+- [ ] Whether any EGS field changes with the D/S/M selector.
+- [ ] Stock baseline consumption with repeatability tolerance (Stage 0).
 
-1. Re-open the 560B bin/XDF locally. Re-check the KFMIMR/KFMRMI/KFPED record sizes, LASOABML shape (scalar vs. 6-point curve) and the inconsistent `CWAKR`/`KFAKR_GANG` offsets in `reference-symbols.csv`. Run `find_signature.py`/`local_alignment.py` per symbol window.
-2. Determine the rate of the task `0x31B20` that runs AEVAB and injection time: decode the OS task table at INT `0x6F878`.
-3. Identify the intervention sources `0x3FBF34/0x3FBF38` (fn `0x404D4`), `0x3FC1A3`, `0x3FC195/0x3FC198`, `0x3FC162` (ASC/DSC vs. EGS vs. limiter).
-4. Static masks `0x5B8FD1` (fn `0xF37E34`) and `0x5B90D8`; the `0x3FC234`/`0x5B90F9` path.
-5. Locate AEVABU, AEVABZK, IMLEVABS, KFLAMFA, KFDLASO, TGENOFVL.
-6. Lambda controller, adaptation and measured λ (follow consumers of `0x5B96AA/0x5B96A8`).
-7. ~~Sport-mode flag and CAN message map~~ — done in round 3 (`research/can-and-drive-modes.md`); no sport flag exists in the DME.
-8. VANOS/Valvetronic maps (candidates `0x1C21AC`, `0x1C2500`, `0x1C2636`), knock adaptation, fan PWM (MIOS).
-9. Physical scalings: λ 4096 = 1.0, rpm 0.25/bit, rpm byte 40/bit, temperature 0.75 °C − 48, speed 1/128 km/h. Confirm each with a live log.
+## 3. REQUIRES EGS FIRMWARE (ZF 6HP / EGS software dump)
 
-### Next in-car experiments (read-only logging first)
+- [ ] Identify the exact EGS software.
+- [ ] Meaning of 0x0BA bits 6/7, 0x0B5 bits 24-35 vs 12-23, byte4/byte5 status bits.
+- [ ] Shift schedules, converter lock-up strategy, D/S/M programs.
+- [ ] EGS interpretation of the DME torque words (confirms Nm/bit).
+- [ ] Any E-mode shift programme or earlier lock-up (largest transmission efficiency lever).
 
-* Log the AEVAB chain (`0x5B93E7`, `0x5B92E8`, `0x5B92EA`, `0x5B92EC`) during DSC and EGS shift interventions to confirm the step = round(8·depth) model and the latched phase.
-* Bench check with an injector-pulse logger (or noid lights) that mask bit order = firing order.
-* Kickdown: confirm `0x3FBFB3` sets only past the detent at 100 % pedal.
-* Exhaust flap: confirm the polarity of `0x3FC286`.
-* Cruise control: CAN capture of lever presses to see where a 10 km/h jump (if any) originates.
+## 4. FUTURE CALIBRATION DEVELOPMENT (only after sections 2–3; `research/development-methodology.md`)
 
-## Phase 2 — Logging baseline
+- [ ] Stage 0 stock baseline → Stage 1 model validation (no changes).
+- [ ] Stage 2 single-subsystem experiments: Valvetronic/VANOS part load, ignition (95 RON minimum, knock
+      activity must not rise), generator load management, thermostat target, DFCO, torque-rise filtering.
+- [ ] Stage 3 combined E (all 8 cylinders) — gains are not additive (`research/efficiency-budget.md`).
+- [ ] Stage 4 D validation; Stage 5 S/M validation (`research/performance-mode.md`).
+- [ ] Mode-signal source design (none exists in the DME; `research/final-mode-architecture.md`).
+- [ ] Stage 6 optional ECO-cylinder experiment (`research/firing-density-feasibility.md`) — last, abort on
+      emissions/catalyst/NVH degradation.
+- Rule for every stage: OEM protections stay untouched and higher priority (`research/protection-priority.md`).
 
-- [ ] Capture stock logs on 95 RON.
-- [ ] Record pedal, requested/actual torque, load, RPM, gear, TCC slip, lambda targets/actual, STFT/LTFT, knock retard, VANOS, Valvetronic, MAF/load, coolant/oil/air temperatures and generator load.
-- [ ] Establish fixed A/B test route and repeatability tolerance.
+## What cannot be proven from the DME binary alone
 
-## Phase 3 — Efficiency building blocks
-
-- [ ] Stock 8/8 baseline.
-- [ ] Valvetronic/VANOS cruise optimization.
-- [ ] Ignition optimization with 95 RON as the hard minimum fuel quality.
-- [ ] Generator load shifting.
-- [ ] DFCO/coast optimization.
-- [ ] Mild lean-cruise experiments only after lambda target path is verified.
-- [ ] 6/8 firing tests.
-- [ ] 4/8 firing tests.
-- [ ] Combine features only after isolated validation.
-
-## Phase 4 — E mode
-
-- [ ] Implement latched E-mode request.
-- [ ] E operates at 4/8 or 6/8 under normal conditions.
-- [ ] Native `B_kd` triggers temporary 8/8 power override.
-- [ ] Power override returns automatically to E after hysteresis/stabilization.
-- [ ] Fail-safe returns to stock 8/8 behaviour on invalid conditions or faults.
-
-## Phase 5 — Performance calibration
-
-- [ ] Optimize high-load torque request.
-- [ ] Optimize VANOS/Valvetronic at high load.
-- [ ] Optimize ignition on 95 RON with knock-adaptive benefit on better fuel.
-- [ ] Maintain OEM temperature and catalyst protection paths.
-- [ ] Validate on a dyno or equivalent controlled load measurement before publishing claims.
-
-## Phase 6 — ZF 6HP EGS integration
-
-- [ ] Obtain and identify the exact EGS software.
-- [~] Reverse engineer D/S/M status and DME <-> EGS torque messages (round 3: DME side decoded; D/S/M not present in DME; 0x0A8/0x0A9 torque fields still open).
-- [ ] Tune low-load shift schedule, hysteresis and TCC strategy.
-- [ ] Integrate E-mode shift programme.
-- [ ] Validate NVH with 6/8 and 4/8 firing, especially with locked converter.
-
-## Stretch research
-
-- Dynamic skip-fire rather than fixed-cylinder deactivation.
-- Fuel-quality-adaptive high-load calibration.
-- Exhaust-flap behaviour per drive mode.
-- A/C and generator load shedding during transient acceleration.
-- Thermal target selection by drive mode.
-- CAN-driven E-mode indicator and OEM-like UI integration.
-
-## Round 4 — open questions and next experiments
-
-Static:
-1. Decode 0x0A8/0x0A9 torque fields in the TX builder INT `0x4B128` (inputs `0x5B94C6…0x5B94D2`, `0x5BBA56…`).
-2. Trace the CAN origin of the AEVAB enable flags `0x3FBF34/0x3FBF38` (fn INT `0x404D4`) and `0x3FC1A3`/`0x3FC195`, in particular whether DSC frames (0x0B6/0x0CE/0x19E/0x1A0, decoder INT `0x5B988`) feed them.
-3. Derive the PT-CAN bitrate from the TouCAN CTRL1/PRESDIV initialisation.
-4. Enumerate `bl 0xAC00` output-channel calls (flap = channel 12) to find the thermostat heater and fan outputs.
-5. Split the lambda controller (INT `0x56DD0`) into P/I/adaptation; locate full-load and protection enrichment inputs of INT `0x1A4F0`.
-6. Confirm the meaning of `0x5B90BB` and `0x5B9307` (temperatures?) from their writers.
-7. Re-check TGENOFVL/LASOABML/KFMIMR/KFMRMI names against a locally supplied 560B XDF.
-
-In-car / bench (read-only first):
-1. PT-CAN capture with the selector cycled P-R-N-D-S-M and M-gate taps, correlated with `0x5B92CA`, `0x3FBEE0/DF`, `0x5B8F72`, `0x5B8F73`, `0x3FBEDB/DC`.
-2. Kickdown: confirm 0x0AA byte6 high nibble = 0xB exactly while `0x3FBFB3` = 1.
-3. Converter: correlate 0x1A2 (`0x5B9982`) with engine speed during lock/unlock.
-4. Flap polarity on output channel 12.
-5. AEVAB during DSC/EGS interventions (`0x5B93E7`, `0x5B92EA`, `0x3FBF34/38`), plus exhaust λ/catalyst temperature during any cut event.
-
-## Round 5 — next static-analysis tasks
-
-1. Locate PWM outputs (VANOS solenoids, electric fan, possibly thermostat): TPU3/MIOS channel parameter writes with duty values → back-trace setpoints. Then fill `research/vanos.md`.
-2. Locate knock detection/adaptation (QADC window acquisition → per-cylinder retard and long-term adaptation) to answer the 95/98 RON question.
-3. Decode the priority logic inside lambda arbitration INT `0x1A4F0` and the full-load/protection enrichment maps (`0x1CE1BC`, `0x1C5642`, `0x1C5552`).
-4. Resolve the pointer-based writer of the overrun request `0x3FC162` and the entry/exit/resume thresholds in EXT `0xFAE33C`/`0xFAE940`.
-5. Name the torque words feeding 0x0A8/0x0A9 (`0x5B983A`, `0x5B9878`, `0x5B987A`) by tracing INT `0x4790C` and `0x48F68` against the torque model.
-
-## Round 5 — read-only in-car logging experiments
-
-1. During DSC/EGS interventions: `0x5B92EA`, `0x3FBFFE/FF`, `0x3FC1EE/EF`, `0x3FC1E3`, `0x5B98AE`, `0x5B989E`, `0x5B891E`, measured λ `0x5B9708/0A` → confirm open loop during the cut and the IMLEVABS release timing.
-2. Lean-target behaviour: log `0x5B96AA` vs `0x3FC1E3` at steady cruise to confirm that closed loop is only active at exactly 1.000.
-3. Valvetronic: capture private-bus 0x105/0x10D/0x185/0x18D with `0x5B9D10/12`, `0x5B9BB6`, `0x5B9D14/16`, to get units and the actual-vs-requested lift relationship.
-4. CAN torque words 0x0A8/0x0A9/0x0AA vs pedal, load and EGS shifts, to name the words (max torque, loss torque, driver request).
-5. Outputs: actuator test of channels 4/6/7/8 (thermostat heater, purge) with a current clamp, and generator voltage at full load (TGENOFVL stock = 0 → expect no relief).
+Physical torque units, the meaning of EGS-side bits, EGS shift/lock-up behaviour, the physical
+polarity of actuators, bank labels that depend on wiring, and any fuel-economy or power benefit. These
+need logs, EGS firmware or controlled measurements.

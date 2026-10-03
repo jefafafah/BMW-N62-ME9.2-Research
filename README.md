@@ -1,67 +1,105 @@
 # BMW N62 / Bosch ME9.2 Research
 
-Open research project for understanding and experimentally extending the Bosch ME9.2 powertrain control used with early BMW N62 engines, with an initial focus on the E65 735i / N62B36.
+Open, read-only research into the Bosch ME9.2 engine computer (DME) of the **BMW E65 735i (N62B36 V8)**:
+how the OEM software controls torque, air, fuel, ignition, cooling and the gearbox interface. Reference
+unit: Bosch HW `0 261 209 002`, SW `1037389760`, software family `0087180A770B` ("770B").
 
-This repository is **research-first**. It documents confirmed findings, working hypotheses, design concepts, tooling, test plans, and future experiments. It is not a collection of copyrighted firmware images and it is not a ready-to-flash tune.
+> **This is documentation, not a tune.** No firmware, no patches, no flash images. Everything here is
+> derived from static analysis and is labelled with a confidence level.
 
-## Project goals
+**Start here:** 🗺️ [System flow — how everything works and depends on each other](docs/SYSTEM_FLOW.md) ·
+📘 [Final technical report](docs/FINAL_TECHNICAL_REPORT.md) · 📊 [Research status](RESEARCH_STATUS.md) ·
+🧭 [Roadmap](ROADMAP.md)
 
-1. Preserve OEM safety/fallback behaviour while understanding the ME9.2 control architecture.
-2. Build a repeatable symbol/feature map for the `0087180A770B / 1037389760` software family.
-3. Explore an additional **E (Efficiency)** drive mode using existing Bosch control primitives where possible.
-4. Keep **D** usable as a daily mode and make **S/M** performance-oriented.
-5. Optimize cruise efficiency and high-load performance as separate operating regions.
-6. Later integrate the ZF 6HP EGS so DME and transmission calibration behave as one powertrain.
+---
 
-## Intended mode concept
+## How the system works (short version)
 
-| Mode | Firing strategy | Fuel/load strategy | Transmission intent |
+The DME is **torque-based**. The pedal is turned into a torque request; the DME limits and smooths it,
+merges it with requests from the gearbox (EGS), stability control (DSC) and the rev limiter, and then
+delivers it: slowly through **air** (Valvetronic valve lift, VANOS cam timing) and quickly through
+**ignition angle**; only in rare interventions by **cutting injectors**. Lambda control meters fuel to
+the air. Cooling, alternator and exhaust flap run alongside. Protections (fuel cut, knock control,
+component protection) always win. [Read more →](docs/SYSTEM_FLOW.md)
+
+| Subsystem | What it does (proven) | Status | Read more |
 |---|---|---|---|
-| **E** | 4/8 or 6/8 firing density | efficiency first, experimental mild lean cruise | early upshift, early/controlled TCC lock |
-| **E + kickdown** | temporary 8/8 | power override | aggressive downshift, then automatic return to E |
-| **D** | 6/8 or 8/8; 4/8 only if proven useful | OEM-like daily behaviour with efficiency improvements | balanced |
-| **S** | 8/8 | performance calibration | sport shift programme |
-| **M** | 8/8 | performance calibration | manual gear selection retained |
+| Driver wish & torque-rise filter | pedal map KFPED, cruise, EGS rise limiter, tip-in filter whose speed depends on gear and turbine/engine speed ratio | CONFIRMED | [→](research/egs-tcc-shift-state.md) |
+| Torque structure | torque models, `min`/`max` arbitration of driver, EGS, DSC, rev limiter; ignition first, cylinder cut only for limiter/DSC/faults | CONFIRMED | [→](research/torque-and-modes.md) |
+| DME ↔ gearbox (EGS) CAN | torque words 0x0A8/0x0A9/0x0AA; gear, torque request, cooling request and turbine speed from the EGS; no D/S/M state in the DME | CONFIRMED / HIGH CONFIDENCE | [→](research/dme-egs-interface.md) |
+| Valvetronic | one lift request per bank (no per-cylinder control), lift maps, bank balancing | CONFIRMED / HIGH CONFIDENCE | [→](research/valvetronic.md) |
+| VANOS | 4 cams, intake = objects 0/2, exhaust = 1/3, map families normal/warm-up/idle/full load | CONFIRMED / HIGH CONFIDENCE | [→](research/vanos.md) |
+| Ignition & knock | base/full-load/idle maps, per-cylinder knock retard and adaptation (never above the base map) | CONFIRMED | [→](research/ignition-knock-fuel-quality.md) |
+| Late ignition & catalyst heating | how interventions, cold start and overrun move the ignition angle later | CONFIRMED / LIKELY | [→](research/late-ignition-and-catalyst-heating.md) |
+| Lambda | richest request wins, component protection always at least as rich as full load, cut-lambda on both banks | CONFIRMED | [→](research/lambda-control.md) |
+| Full-load & protection lambda | full-load λ 0.922, exhaust-temperature/retard protection enrichment | CONFIRMED | [→](research/full-load-enrichment.md) |
+| Cylinder cut (AEVAB) | REDABM patterns in firing order, priority layers | CONFIRMED | [→](research/aevab-redabm.md) |
+| Overrun fuel cut (DFCO) | complete state machine, resume by temperature, blocked by DSC/EGS torque increase | CONFIRMED | [→](research/overrun-dfco.md) |
+| Generator | voltage request (mV), BSD interface, generator torque model | CONFIRMED / HIGH CONFIDENCE | [→](research/generator-control.md) |
+| Cooling | electric fan PWM ch 9, map-thermostat heater, coolant targets | HIGH CONFIDENCE | [→](research/thermal-management.md) |
+| Exhaust flap | gear × rpm pedal thresholds; command 1 = closed | CONFIRMED / HIGH CONFIDENCE | [→](research/exhaust-flap.md) |
 
-The preferred implementation is **rotating/selective firing density**, not permanently disabling the same four cylinders. The N62 does not have OEM mechanical valve deactivation, so fixed cylinder shutdown would still incur pumping and friction losses.
+## What has been proven
 
-## Current high-confidence findings
+* Memory layout, calibration alias and the full AEVAB chain. [→](research/verified-findings.md)
+* The complete torque arbitration and the meaning/scaling ratio of every DME→EGS torque word. [→](research/torque-and-modes.md)
+* The EGS torque-intervention path (0x0B5 → ignition retard; EGS never cuts cylinders on its own). [→](research/dme-egs-interface.md)
+* Lambda arbitration and the priority of component protection. [→](research/protection-priority.md)
+* **195 automated checks** reproduce these claims from your own dump. [→](tools/README.md)
 
-- The 1 MiB external flash reference identifies Bosch HW `0261209002` and SW `1037389760` / software family `0087180A770B`.
-- The 560B reference XDF contains `CWEVAB` (injector shutoff codeword) and `REDABM` (injector shutoff pattern for torque reduction).
-- The `REDABM` matrix from 560B occurs byte-identically in the 770B reference at external-flash offset `0xC5510`.
-- Reduction step 4 uses alternating masks `0x55` and `0xAA`, proving that the Bosch strategy already has a balanced 4-of-8 firing pattern available.
-- Bosch ME9.2.1 reference material exposes a kickdown state (`B_kd`) and calibrations for kickdown detection, making an E-mode power override feasible without inventing an arbitrary pedal percentage.
-- The reference definitions include generator load-shedding, exhaust-flap control, sport-mode driver wish, cylinder-cut lambda handling, knock adaptation, VANOS/Valvetronic maps, thermal management and torque-model infrastructure.
+## What is still research
 
-See [`RESEARCH_STATUS.md`](RESEARCH_STATUS.md) and [`research/verified-findings.md`](research/verified-findings.md) for evidence and confidence levels.
+* Physical units that the binary does not define (torque Nm/bit, 0x1A2 rpm/bit, vehicle speed unit). [→](research/in-car-validation-plan.md)
+* Which VANOS pair is bank 1, flap polarity on the car, meaning of some EGS status bits. [→](RESEARCH_STATUS.md)
+* Everything inside the EGS (shift maps, converter lock-up, D/S/M programs) needs the EGS firmware. [→](ROADMAP.md)
 
-## What is deliberately not stored here
+## Future concept (not implemented)
 
-- Full BMW/Bosch firmware images
-- EEPROM contents
-- VIN/immobilizer-specific data
-- Paid/commercial dump archives
-- WinOLS project files, DAMOS/A2L files, or third-party copyrighted material unless redistribution rights are explicit
+E = maximum efficiency **with all 8 cylinders**; an optional manual ECO-cylinder mode only as a late,
+validated experiment; D = smooth and conservative; S/M = direct and performance-oriented; kickdown =
+immediate full 8-cylinder capability. OEM protections always override modes.
+[Mode architecture →](research/final-mode-architecture.md) · [Protection priority →](research/protection-priority.md) ·
+[Efficiency budget →](research/efficiency-budget.md) · [Performance →](research/performance-mode.md) ·
+[Firing-density feasibility →](research/firing-density-feasibility.md)
 
-The repository instead records hashes, identifiers, source links, derived research notes and reproducible tools.
+## What to do next
 
-## Safety and validation
+1. Read-only logging on the car (stationary and driving tests). [Validation plan →](research/in-car-validation-plan.md)
+2. Follow the staged method: baseline → model validation → one change at a time. [Methodology →](research/development-methodology.md)
 
-No experimental calibration should be flashed before:
+## Reproduce the verification
 
-- an ECU-specific full backup exists;
-- the exact HW/SW IDs are confirmed;
-- checksum handling is verified;
-- a stable programming power supply is used;
-- stock recovery is proven;
-- changes are tested one subsystem at a time with logging;
-- lambda, knock, temperature, misfire and transmission behaviour are monitored.
+```sh
+pip install capstone                       # only needed for disassembly listings
+export ME9_INT=/path/outside/repo/mpc555-6.bin ME9_EXT=/path/outside/repo/28f200f3t.bin
+python tools/me9_image.py hash             # must report "reference" for both files
+python tools/verify_770b_findings.py       # expected: 195/195 checks passed
+```
 
-This project intentionally keeps OEM protection paths as the default fallback.
+The dumps are **your own** reads of the ECU; they are never part of this repository. Tools:
+[tools/README.md](tools/README.md).
 
-## Status
+## Explicitly not provided
 
-**Research / reverse-engineering phase. No public flash-ready calibration yet.**
+* BMW/Bosch firmware images, EEPROM contents, VIN/ISN/immobiliser data
+* WinOLS projects, DAMOS/A2L files or other commercial material without redistribution rights
+* Flash-ready calibrations, patches or instructions to bypass protections, diagnostics or emissions systems
 
-Last structured update: 2026-10-03.
+## Safety
+
+No calibration should ever be flashed without a full backup, verified IDs and checksums, a stable power
+supply, a proven return-to-stock path, and one-change-at-a-time validation with lambda, knock, temperature,
+misfire and transmission monitoring. OEM protections remain the default fallback.
+
+## Document index
+
+| Area | Documents |
+|---|---|
+| Overview | [System flow](docs/SYSTEM_FLOW.md) · [Final report](docs/FINAL_TECHNICAL_REPORT.md) · [Status](RESEARCH_STATUS.md) · [Roadmap](ROADMAP.md) |
+| Evidence | [Verified findings](research/verified-findings.md) · [Symbol map (CSV)](research/symbol-map-770B.csv) · [560B→770B mapping](research/560B-to-770B-mapping.md) · [Sources](references/SOURCES.md) |
+| Engine control | [Torque](research/torque-and-modes.md) · [Valvetronic](research/valvetronic.md) · [VANOS](research/vanos.md) · [Ignition & knock](research/ignition-knock-fuel-quality.md) · [Lambda](research/lambda-control.md) · [Full load](research/full-load-enrichment.md) · [Cylinder-cut lambda](research/cylinder-cut-lambda.md) · [AEVAB](research/aevab-redabm.md) · [DFCO](research/overrun-dfco.md) · [Kickdown](research/kickdown-path.md) |
+| Vehicle interfaces | [DME↔EGS](research/dme-egs-interface.md) · [Turbine speed](research/egs-tcc-shift-state.md) · [CAN & drive modes](research/can-and-drive-modes.md) · [Generator](research/generator-control.md) · [Thermal](research/thermal-management.md) · [Exhaust flap](research/exhaust-flap.md) |
+| Concept & method | [Mode architecture](research/final-mode-architecture.md) · [Protection priority](research/protection-priority.md) · [Efficiency budget](research/efficiency-budget.md) · [Performance](research/performance-mode.md) · [Late ignition](research/late-ignition-and-catalyst-heating.md) · [Firing density](research/firing-density-feasibility.md) · [Validation plan](research/in-car-validation-plan.md) · [Methodology](research/development-methodology.md) |
+| Early concept notes (superseded where they conflict) | [docs/](docs/) |
+
+Last structured update: 2026-10-03 (final static pass).

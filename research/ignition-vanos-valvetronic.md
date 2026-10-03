@@ -1,5 +1,8 @@
 # Ignition, VANOS and Valvetronic (770B) — round 2 status
 
+> **Final-pass status:** round-2 overview. VANOS (round 5 + final pass), Valvetronic (round 4 + final pass) and knock control (final pass) have since been located; see `vanos.md`, `valvetronic.md`, `ignition-knock-fuel-quality.md`.
+
+
 Address conventions as in `research/aevab-redabm.md`. This area got the least time in round 2.
 Everything below is a candidate unless stated otherwise.
 

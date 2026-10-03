@@ -1,5 +1,8 @@
 # E-mode kickdown power override
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [final-mode-architecture.md](../research/final-mode-architecture.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 ## Existing Bosch mechanism
 
 The ME9.2.1 725D A2L exposes the function `BBKD` and output `B_kd` (*Bedingung Kick-Down*). Relevant calibration symbols include:

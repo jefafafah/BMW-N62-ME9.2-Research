@@ -1,5 +1,8 @@
 # Exhaust-flap strategy
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [exhaust-flap.md](../research/exhaust-flap.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 The reference definitions include exhaust-flap control, including `CWAKR` and `KFAKR_GANG` plus temperature/RPM/gear-dependent logic.
 
 ## Proposed mode behaviour

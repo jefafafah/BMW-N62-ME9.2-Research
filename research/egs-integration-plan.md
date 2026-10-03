@@ -1,5 +1,8 @@
 # EGS / ZF 6HP integration — capture and correlation plan
 
+> **Final-pass status:** pre-analysis integration plan; the DME side of the interface is now decoded (`dme-egs-interface.md`) and the logging plan is `in-car-validation-plan.md`. EGS-side items still need EGS firmware.
+
+
 No EGS binary is available, so nothing on the EGS side is modified or claimed. This plan defines
 what to capture so that D/S/M, kickdown, converter lock, gear and torque intervention can later be
 correlated with DME internals.

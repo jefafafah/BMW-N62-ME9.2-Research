@@ -1,5 +1,8 @@
 # Sport mode in 770B — round 3 verdict
 
+> **Final-pass status:** conclusion unchanged and strengthened: no sport/program state in the DME (HIGH CONFIDENCE, `dme-egs-interface.md` final pass §4).
+
+
 ## Question
 
 Is sport behaviour (KFPEDS-type driver wish, sport acceleration/resume ramps, sport pedal/torque

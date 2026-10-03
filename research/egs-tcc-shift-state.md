@@ -87,8 +87,8 @@ No other code reads `0x5B97F0` (xref plus a raw scan for the `0x5C`/`-0x6810` pa
 ### What `0x5B982A` controls (INT `0x46FAC…0x470C4`)
 
 `0x5B982A` (K) is the step gain of a second-order low-pass on the torque request `0x5B9808`
-(= min(driver-request torque `0x5B980A`, a second request word read through `r19`), written at INT
-`0x46828`). Helper INT `0x16070` is a saturating
+(= min(driver-request torque `0x5B980A`, maximum available torque `0x5B9854` read through `r19`), written at
+INT `0x46828`; the `r19` identity was resolved in the final pass). Helper INT `0x16070` is a saturating
 32-bit `state += K · delta`, and INT `0x1DEC4` is `(a·b) >> 16`.
 
 ```

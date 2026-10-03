@@ -1,5 +1,8 @@
 # Active hypotheses
 
+> **Final-pass status:** early hypothesis list; current confidence per item is in `RESEARCH_STATUS.md`.
+
+
 ## H1 — E-mode efficiency through 4/8 and 6/8 firing density
 
 The Bosch torque-reduction machinery can likely be reused for controlled skip-fire, but it needs a separate load/torque strategy so wheel torque is not simply reduced. Benefit is unknown until measured.

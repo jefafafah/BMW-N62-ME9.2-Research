@@ -1,5 +1,8 @@
 # Adaptive firing density / cylinder cut research
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [firing-density-feasibility.md](../research/firing-density-feasibility.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 ## Confirmed OEM primitive
 
 The 560B XDF defines:

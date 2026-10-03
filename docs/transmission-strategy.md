@@ -1,5 +1,8 @@
 # ZF 6HP / EGS integration plan
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [dme-egs-interface.md](../research/dme-egs-interface.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 No EGS binary has been analyzed yet. Everything in this document is a design target until the exact transmission software is read and identified.
 
 ## Efficiency opportunities

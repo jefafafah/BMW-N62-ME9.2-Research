@@ -1,5 +1,8 @@
 # Performance calibration concept
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [performance-mode.md](../research/performance-mode.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 Efficiency and peak performance occupy different load regions, so the project can optimize both without making one compromise map.
 
 ## Fuel requirement

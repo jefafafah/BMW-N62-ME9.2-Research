@@ -1,5 +1,8 @@
 # CAN inputs and drive-mode representation (770B) — round 3
 
+> **Final-pass status:** round-3 CAN map. Final-pass corrections: 0x0B5 bytes 0-3 carry an EGS torque request read from the raw RX buffer (EXT `0xF15450`); 0x0B6 is the torque-intervention frame (DSC LIKELY); `0x3FBF34/38` are fault reactions, not DSC; D/S/M absence is HIGH CONFIDENCE. See `dme-egs-interface.md` and `torque-and-modes.md` final passes.
+
+
 Address kinds: **INT** = internal-flash CPU address; **EXT** = external-flash CPU address (file =
 CPU − 0xF00000); **CAL** = calibration CPU alias (file = CPU − 0x100000); **RAM** = runtime address.
 Reproduce: `python tools/me9_can.py --users`, `python tools/verify_770b_findings.py`.

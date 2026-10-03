@@ -1,5 +1,8 @@
 # AEVAB / REDABM — selective injector shutoff in 770B
 
+> **Final-pass status:** logic CONFIRMED and unchanged. Intervention-source names were resolved in the final pass (`torque-and-modes.md` §3, `protection-priority.md`).
+
+
 Target: SW `1037389760` (family `0087180A770B`), HW `0261209002`.
 Address conventions: **CPU** = MPC555 address as used by code; calibration is read through the
 CPU alias `0x1C0000–0x1DFFFF` (= external-flash file offset `CPU − 0x100000`, same bytes as CPU

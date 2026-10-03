@@ -1,5 +1,8 @@
 # Proposed powertrain architecture
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [final-mode-architecture.md](../research/final-mode-architecture.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 ## Principle
 
 Reuse OEM Bosch mechanisms where they already solve difficult real-time problems (injector sequencing, kickdown state, knock adaptation, generator load handling, lambda recovery, fault fallback) and add as little custom logic as possible.

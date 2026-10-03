@@ -1,5 +1,8 @@
 # Efficiency estimate and measurement policy
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [efficiency-budget.md](../research/efficiency-budget.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 This project treats efficiency estimates as hypotheses until A/B tested.
 
 ## Current engineering estimate

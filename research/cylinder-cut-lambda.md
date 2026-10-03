@@ -1,5 +1,8 @@
 # Cylinder cut and lambda control (770B) — round 4
 
+> **Final-pass correction:** the setpoint window around λ 1.000 gates the λ-modulation flag `0x3FC1E3/E4`, not the integrator, and the cut setpoint replaces the base setpoint of **both** banks while the uncut bank keeps regulating around the lean cut target. See `lambda-control.md` final pass §0.
+
+
 Address kinds: **INT** = internal-flash CPU, **EXT** = external-flash CPU, **CAL** = calibration alias
 (file = CPU − 0x100000), **RAM** = runtime. All CONFIRMED rows are re-checked by
 `tools/verify_770b_findings.py` (round-4 section).

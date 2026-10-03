@@ -1,5 +1,8 @@
 # 560B → 770B symbol mapping — method and round-2 results
 
+> **Final-pass status:** round-2 port table. Several 'not located' symbols were found later: IMLEVABS → CAL `0x1C99C2` (round 4), KFLAMFA candidate → CAL `0x1CE1BC` (final pass, neutral in stock), TGENOFVL → CAL `0x1C9412` (round 4). Current status per symbol: `symbol-map-770B.csv`.
+
+
 ## 1. Inputs and a limitation of this round
 
 * 770B: local dumps (hashes in `verified-findings.md`), analysed in CPU address space with

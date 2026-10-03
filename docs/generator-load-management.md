@@ -1,5 +1,8 @@
 # Generator load management
 
+> **Superseded concept note (pre-analysis).** Kept for history. Where it conflicts with the final static pass, the current document wins: [generator-control.md](../research/generator-control.md). The current concept keeps E-mode at 8/8; cylinder cut is only an optional late experiment ([final mode architecture](../research/final-mode-architecture.md)).
+
+
 The reference definitions contain an OEM full-load generator-shedding mechanism.
 
 Relevant symbols include:

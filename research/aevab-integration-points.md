@@ -1,5 +1,8 @@
 # AEVAB integration points for a future efficiency request — round 3 analysis
 
+> **Final-pass status:** round-3 analysis. Final-pass correction: `0x3FBF34/38` are fault reactions (not DSC/ASC), `0x3FC1A3` is the rev limiter, `0x3FC195` is DSC-dominant; the overrun request `0x3FC162` does not enable the step (CAL `0x1C8A18` bit1 = 0). See `torque-and-modes.md` final pass and `protection-priority.md`.
+
+
 No code is changed or proposed as a patch. Addresses: INT = internal-flash CPU, RAM = runtime.
 Details of the stock chain: `aevab-redabm.md`.
 

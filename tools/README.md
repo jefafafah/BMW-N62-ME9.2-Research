@@ -23,11 +23,17 @@ Round 4:
 
 - `me9_trace.py` — `outputs` (digital output-stage channels with command bytes; marks the INT `0xAB88` channels as inputs) and `lookups <fn>` (each curve/map lookup in a function with the RAM loads/stores around it).
 
+Round 7 (final pass):
+
+- `me9_deps.py` — heuristic RAM writer/reader dependency graph (`access`, `upstream`, `downstream`, `--dot`); local syntactic approximation, confirm each edge in the disassembly.
+- `me9_pwm.py` — PWM channel enumerator: decodes the logical-channel table INT `0x156AC` and lists every PWM API call site with its duty/period sources (`--ch N` for one channel).
+- `verify_770b_findings.py` now runs 195 checks (84 from rounds 2–6, 111 final pass).
+
 Images are passed as `--int/--ext` or via `ME9_INT`/`ME9_EXT`, e.g.
 
 ```sh
 export ME9_INT=/path/outside/repo/mpc555-6.bin ME9_EXT=/path/outside/repo/28f200f3t.bin
-python tools/verify_770b_findings.py
+python tools/verify_770b_findings.py      # expected: 195/195
 python tools/me9_xref.py build && python tools/me9_xref.py refs 0x5B92EA
 python tools/me9_tables.py > /tmp/770b-tables.csv
 ```

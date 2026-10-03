@@ -163,3 +163,12 @@ fn; the CAN torque converter and the 0x0A8/0x0A9 torque sources; and the generat
 Corrections in this round: a λ target ≠ 1.000 disables closed loop (round 3 implied it would move
 the controller target); INT `0xAB88` handles digital inputs; the round-2 VANOS candidate fn INT
 `0x406B0` is the air-charge model.
+
+# Final static pass (round 7, 2026-10-03)
+
+The verifier now holds 195 checks (84 from rounds 2–6, 111 final pass). The final-pass blocks cover:
+0x0BA/0x0B5/0x5C3 status fields; torque CAN scaling and the EGS/DSC raw-buffer decodes; the torque
+arbitration; Valvetronic protocol, feedback and target chain; VANOS units and assignment; ignition maps,
+final angle and knock control; lambda arbitration, codeword and per-bank paths; DFCO state machine and
+generator chain; PWM table, fan, thermostat heater and exhaust flap. Findings and corrections are in the
+*Final static pass* sections of the subsystem notes; the consolidated status is `RESEARCH_STATUS.md`.
