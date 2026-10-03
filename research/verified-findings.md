@@ -54,3 +54,81 @@ The fourth reduction column yields alternating `0x55` / `0xAA`, a balanced four-
 The XDF defines `CWEVAB` at file offset `0xD8B4` as an 8-bit injector shutoff codeword.
 
 Local 560B -> 770B alignment around this region contains multiple strong blocks, but small insert/delete changes occur around the candidate location. `~0xCD9CA` remains a **LIKELY** candidate and is not yet classified as confirmed.
+
+> **Round-2 update:** `0xCD9CA` (CPU `0x1CD9CA`) is read by EXT fn `0xF7BEE4` and OR-ed into the
+> per-cylinder injector-cut mask `0x5B88C5` consumed by AEVAB. Function **CONFIRMED**, name
+> **HIGH CONFIDENCE** (see below).
+
+---
+
+# Round 2 (2026-10-03) — static analysis of 770B code
+
+Method: the internal-flash read and the external-flash read were loaded into one CPU address space
+and scanned with a register-tracking xref builder. Lookup-helper call sites gave the table geometry.
+All results come from 770B code. The 560B XDF/bin and the 725D A2L were **not** re-opened in this
+round; only the 560B offsets/descriptions already recorded in `reference-symbols.csv` were used.
+
+Every claim below marked CONFIRMED is re-checked by
+`python tools/verify_770b_findings.py --int <mpc555-6.bin> --ext <28f200f3t.bin>`
+(31/31 checks pass on the reference dump).
+
+Confidence labels: **CONFIRMED** (direct from code/data), **HIGH CONFIDENCE** (two independent
+lines of evidence, one of which depends on a reference not re-verified this round), **LIKELY**,
+**HYPOTHESIS**, **REJECTED**.
+
+Address kinds: *CPU* = MPC555 address; *ext file* = offset in `28f200f3t.bin`; *int file* = offset
+in `mpc555-6.bin` (equal to its CPU address); *RAM* = runtime address, not in any dump.
+
+## Memory architecture
+
+| Finding | Status | Evidence |
+|---|---|---|
+| CPU = MPC555 (USIU `0x2FC000`, TPU3 A/B `0x304000/0x304400`, QADC A/B `0x304800/0x304C00`, QSMCM `0x305000`, MIOS `0x306000`, TouCAN A/B `0x307080/0x307480`, UIMB `0x307F80`) | CONFIRMED | I/O accesses in code hit exactly these blocks |
+| Internal flash `mpc555-6.bin` maps at CPU `0x000000` (448 KiB code/data `0x00000–0x6FFFF`) | CONFIRMED | absolute branches (`ba 0x1C840`, `ba 0x1C7A0`) from the branch table at int `0x8000` land on valid code next to the application r2/r13 setup at int `0x1C828` |
+| int `0x00000–0x7FFF`: boot/startup stubs and vectors (own r13 `0x4017F0`, r2 `0x00F7CC`) | LIKELY (extent) | vector stubs at `0x0`, `0x100`; own small-data bases at int `0x1E4` |
+| int `0x70000–0x70FFF` (extra 4 KiB in the read: `0x40001000`, then `FF`) | HYPOTHESIS | MPC555 shadow/config row |
+| External flash maps at CPU `0xF00000–0xFFFFFF` (ext file = CPU − `0xF00000`) | CONFIRMED | block headers hold self-pointers `0x00F00080`, `0x00FC0080`; absolute loads `lis 0xF0/0xF1` |
+| Program block: header ext `0x00000` (`5A5A5A5A 33333333`), entry `0xF04218`, end markers at CPU `0xF0FF48` and `0xFEFFD0` | CONFIRMED | header fields and `5A5A5A5A` markers at those addresses |
+| Data block: header ext `0xC0000` (`5A5A5A5A CCCCCCCC`), end marker CPU `0xFDFF58` | CONFIRMED | header field + marker |
+| Calibration data occupies ext `0xC0000–~0xD2000`; ext `~0xD2000–0xDFF58` (CPU `0xFD2000…`) holds **code** | CONFIRMED | no prologues/`blr` below `0xD2000`; ≥ 120 `blr` above; code xrefs reach CPU alias only up to `0x1D2000` |
+| ext `0xF0000–0xFFFFF` (CPU `0xFF0000…`): software ID `0087180A770B` at ext `0xF0018`, QADC channel table, exception dispatch target `0xFFC408` | CONFIRMED (ID, call target); table role LIKELY | |
+| **Code reads calibration through CPU alias `0x1C0000–0x1DFFFF` = ext file `CPU − 0x100000`** | CONFIRMED | e.g. REDABM formed as `r2 − 0x2AE0 = 0x1C5510` at int `0x2C560`; ≈ 8,200 calibration refs via the alias vs ≈ 300 via `0xFCxxxx` |
+| Alias mechanism (chip-select mirror vs. overlay) | HYPOTHESIS | not determined |
+| Application small-data bases: **r13 = `0x401A20`**, **r2 = `0x1C7FF0`** | CONFIRMED | int `0x1C828–0x1C834` and ext `0xF0422C–0xF04238` (identical sequences) |
+| r2 window `0x1C0000–0x1CFFEF` = first 64 KiB of calibration; rest via `lis 0x1D` | CONFIRMED | |
+| r13 window covers internal SRAM `0x3F9A20–0x3FFFFF`; initial stack `0x3FF0F8` | CONFIRMED | |
+| Internal SRAM `0x3F9800–0x3FFFFF` (≈ 27,900 refs) | CONFIRMED | |
+| External RAM `0x5B8000–0x5BFFFF` (refs `0x5B7FFC…0x5C0000`, read/write) | CONFIRMED usage; size LIKELY | |
+| Application code is split over internal **and** external flash (EXT→INT 2038 calls, INT→EXT 207) | CONFIRMED | e.g. AEVAB, injection time, kickdown, driver wish live in internal flash |
+| EEPROM layout | not analysed (EEPROM deliberately not used) | |
+
+## Selective injector shutoff (details: `aevab-redabm.md`)
+
+| Finding | Status |
+|---|---|
+| REDABM at CPU `0x1C5510` is used by AEVAB (int `0x2C060`) as `REDABM[phase][step−1]` | CONFIRMED |
+| Phase = (segment counter `0x5B907C` + 4) mod 8, latched once per reduction event | CONFIRMED |
+| Mask bit *n* = *n*-th cylinder in firing order 1‑5‑4‑8‑6‑3‑7‑2; bit = 1 → injection time 0 | CONFIRMED (bank constant `0x5A`) |
+| `0x55` cuts cylinders 1,4,6,7; `0xAA` cuts 5,8,3,2 | CONFIRMED |
+| Step = round(8·(1 − target/base torque)) with hysteresis (`MDHYEZ` `0x1C8A1A`, rounding cal `0x1C8A1B/1C`) | CONFIRMED logic, torque-signal names LIKELY |
+| Total cut: bit word `0x5BBBA8` ≠ 0 → mask `0xFF` | CONFIRMED |
+| CWEVAB `0x1CD9CA` = static OR mask | CONFIRMED function, HIGH CONFIDENCE name |
+| OEM pattern rotates every cycle | REJECTED |
+
+## Torque, kickdown, lambda, flap, thermal, generator, cruise
+
+| Finding | Status | Detail |
+|---|---|---|
+| KFPED = map `0x1C87DA` (16×8 u16; pedal `0x5B96D8` × rpm `0x5B9A26` → `0x5B981A`) | HIGH CONFIDENCE | `torque-and-modes.md` |
+| KFMIMR `0x1C85FA`, KFMRMI `0x1C86EA` | LIKELY | same |
+| Kickdown fn int `0x3B80C` → `B_kd` `0x3FBFB3`; UPWGKDO/UPWGKDU/WPKDMN = `0x1C1E4A/4B/4C` (WPKDMN = 100 %) | CONFIRMED fn, HIGH CONFIDENCE names | same |
+| `0x1CF610` is a sport pedal map (KFPEDS) | REJECTED as working assumption (linear cruise-equivalent map) | same |
+| Cruise control: no fixed set-speed presets in DME; 1 km/h set-speed step, speed breakpoints 30/50/70/100/130/200 km/h | LIKELY | same, §6 |
+| Cylinder-cut lambda substitution (`0x3FBFFE/FF` → setpoint `0x5B891E` from curve `0x1C6408`) | CONFIRMED mechanism; LASOABML name LIKELY | `lambda-control.md` |
+| Exhaust flap fn `0xF97D8C`, map `0x1D077C` (gear × rpm pedal thresholds), CW `0x1D07E8` | CONFIRMED fn; names LIKELY | `exhaust-flap.md` |
+| Two-level coolant target map `0x1D08A8` (≈ 114 / 85 °C) | LIKELY | `thermal-management.md` |
+| Generator voltage request fn `0xF8A9D0` (16.0/15.0/14.3/11.2/10.6 V constants) | LIKELY | `generator-control.md` |
+| `0x1C941A` = TGENOFVL | REJECTED | same |
+| Ignition maps `0x1CAD5A/0x1CAF04/0x1CB186` (24×16) in fn `0x49600` | LIKELY | `ignition-vanos-valvetronic.md` |
+| One global 560B → 770B offset | REJECTED (deltas −0x84 … +0x118) | `560B-to-770B-mapping.md` |
+| 725D A2L addresses usable directly in 770B | REJECTED | same |

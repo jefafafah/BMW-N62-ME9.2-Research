@@ -1,0 +1,57 @@
+symbol,role,kind,cpu_address,address_space,file_offset,shape_type,ref_560B_offset,local_delta_560B,name_confidence,function_confidence,evidence
+REDABM,injector shutoff pattern matrix [phase][step],calibration,0x1C5510,CAL alias (code view),ext 0xC5510,8x8 u8 raw,0x54A0,+0x70,CONFIRMED,CONFIRMED,byte-identical to 560B; formed as r2-0x2AE0 at INT 0x2C560/0x2C6E4 and indexed [0x5B92E4][0x5B92E6-1]
+CWEVAB,static injector shutoff codeword (bit n = firing-order position n),calibration,0x1CD9CA,CAL alias (absolute lis 0x1D),ext 0xCD9CA,u8 scalar (stock 0x00),0xD8B4,+0x116,HIGH CONFIDENCE,CONFIRMED,EXT fn 0xF7BEE4 ORs it into cylinder-off mask 0x5B88C5 that feeds AEVAB; matches round-1 alignment candidate and 560B XDF description
+MDHYEZ,torque hysteresis for cylinder-blanking decision,calibration,0x1C8A1A,CAL alias (r2+0xA2A),ext 0xC8A1A,u8 scalar x256 (stock 0x0A),0x8902,+0x118,HIGH CONFIDENCE,CONFIRMED,INT fn 0x484F8: blanking allowed/blocked by comparing torque against target with this offset (flag 0x3FC19E)
+(unnamed) AEVAB step codeword,enables bit0/bit1 sources of step request,calibration,0x1C8A18,CAL alias,ext 0xC8A18,u8 bitfield (stock 0x01),,,HYPOTHESIS,CONFIRMED,INT fn 0x484F8 tests bit0 with 0x3FC195 and bit1 with 0x3FC162
+(unnamed) AEVAB rounding offsets,step rounding hysteresis (x20/1000 cylinder),calibration,0x1C8A1B/0x1C8A1C,CAL alias,ext 0xC8A1B/0xC8A1C,s8/u8 scalars (6/13),,,HYPOTHESIS,CONFIRMED,INT 0x487E0-0x48808
+(unnamed) AEVAB minimum count source,compared with computed step,RAM,0x5B93E8,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,written by EXT 0xF889FC; step only applied if >= this
+(unnamed) total-cut rpm threshold,used in total-cut request,calibration,0x1C5550,CAL alias (r2-0x2AA0),ext 0xC5550,u8 scalar (stock 0x23),,,HYPOTHESIS,CONFIRMED,INT fn 0x42FC4 compares 0x5B9001 against it; located directly after REDABM
+KFPED,relative driver-wish torque vs pedal/rpm,calibration,0x1C87DA,CAL alias (r2+0x7EA),ext 0xC87DA,map 16x8 u16 (x=pedal y=rpm; values x-major),0x86E6,+0xF4,HIGH CONFIDENCE,CONFIRMED,INT 0x46370 lookup with x=0x5B96D8 y=0x5B9A26 -> 0x5B981A; 0..32768 output; contiguous with the two 0xF0-byte records below exactly as in 560B
+KFMRMI,relative indicated-torque increase in pedal overtravel,calibration,0x1C86EA,CAL alias,ext 0xC86EA,map 16x6 u16,0x85F6,+0xF4,LIKELY,CONFIRMED (lookup),INT 0x46680 lookup x=rpm 0x5B9A26 y=0x5B97EE -> 0x5B980C; name from 560B record order
+KFMIMR,pedal-overtravel torque increase,calibration,0x1C85FA,CAL alias,ext 0xC85FA,map 16x6 u16,0x8506,+0xF4,LIKELY,CONFIRMED (lookup),INT 0x467B0 lookup x=rpm y=0x3FB460; name from 560B record order
+UPWGKDO,kickdown ON pedal-pot voltage threshold (x4),calibration,0x1C1E4A,CAL alias (r2-0x61A6),ext 0xC1E4A,u8 scalar (0xD2),0x1ECE,-0x84,HIGH CONFIDENCE,CONFIRMED,INT fn 0x3B80C sets B_kd when 0x5B96D0 >= 4*value
+UPWGKDU,kickdown OFF pedal-pot voltage threshold (x4),calibration,0x1C1E4B,CAL alias (r2-0x61A5),ext 0xC1E4B,u8 scalar (0xCE),0x1ECF,-0x84,HIGH CONFIDENCE,CONFIRMED,INT fn 0x3B80C clears B_kd when 0x5B96D0 <= 4*value
+WPKDMN,minimum pedal value for kickdown,calibration,0x1C1E4C,CAL alias (r2-0x61A4),ext 0xC1E4C,u16 scalar (0xFFFF = 100%),0x1ED0,-0x84,HIGH CONFIDENCE,CONFIRMED,INT fn 0x3B80C: no kickdown while 0x5B96D8 < value
+LASOABML,lambda setpoint during cylinder/bank shutoff,calibration,0x1C6408,CAL alias (r2-0x1BE8),ext 0xC6408,curve 6 u8 (data 0x1C640F; 1/128 lambda),0x6349,+0xBF (record),LIKELY,CONFIRMED (function),EXT 0xF7E63C -> 0x5B891E; INT fn 0x5563C uses it as per-bank lambda setpoint while 0x3FBFFE/0x3FBFFF set
+(unnamed) lambda snap window,setpoint forced to 1.000 inside window,calibration,0x1C6416/0x1C6418,CAL alias,ext 0xC6416/0xC6418,u16 (0x1005/0x0FFA = 1.0012/0.9985),,,HYPOTHESIS,CONFIRMED,INT 0x55824-0x55844
+KFAKR_GANG,exhaust-flap pedal threshold vs gear/rpm,calibration,0x1D077C,CAL alias (absolute),ext 0xD077C,map 7x12 u8 (x=gear 0..6 y=rpm/40),0x10655 (inconsistent; see notes),n/a,LIKELY,CONFIRMED,EXT fn 0xF97D8C: pedal>>8 compared with map value (hysteresis 0x1D07EA) -> flap command 0x3FC286
+CWAKR,exhaust-flap codeword,calibration,0x1D07E8,CAL alias (absolute),ext 0xD07E8,u8 bitfield (stock 0x14),0xD2827 (inconsistent; see notes),n/a,LIKELY,CONFIRMED,EXT fn 0xF97D8C tests bits 0/2/3/4/5
+(unnamed) coolant target map,two-level coolant temperature target,calibration,0x1D08A8,CAL alias (absolute),ext 0xD08A8,map 8x8 u8 (values 177/216),,,HYPOTHESIS,LIKELY,EXT fn 0xF9E148; 177/216 = 84.75/114 degC if 0.75 degC/bit -48 offset (scaling assumed)
+(unnamed) ignition maps A/B/C,basic/alternate ignition angle maps,calibration,0x1CAD5A/0x1CAF04/0x1CB186,CAL alias,ext 0xCAD5A/0xCAF04/0xCB186,map 24x16 s8 (x=rpm/40 y=load*0.75),,,HYPOTHESIS,LIKELY,INT fn 0x49600 (largest consumer of 24x16 byte maps); shape/values typical of spark advance
+(unnamed) second pedal map,linear pedal remap (KFPEDS candidate),calibration,0x1CF610,CAL alias,ext 0xCF610,map 16x8 u16,,,HYPOTHESIS,CONFIRMED (lookup),EXT 0xFA483C: x=0x5B954E y=0x5B9A26 -> 0x5B9820 -> rate limited 0x5B9822; values linear 2x so role unclear
+(unnamed) generator voltage limits,generator voltage request bounds (mV),calibration,0x1C943C..0x1C9446,CAL alias,ext 0xC943C..0xC9446,u16 scalars 16000/100/15000/14300/11200/10600,,,HYPOTHESIS,LIKELY,EXT fn 0xF8A9D0
+B_kd,kickdown condition,RAM,0x3FBFB3,internal SRAM,,u8 flag,,,HIGH CONFIDENCE,CONFIRMED,written only by INT 0x3B80C; read by EXT 0xF1BCC8 and 0xFA8E70
+wped (pedal),accelerator pedal value 0..65535,RAM,0x5B96D8,external RAM,,u16,,,LIKELY,CONFIRMED,KFPED x input; compared with WPKDMN
+upwg (pedal pot voltage),pedal sensor voltage used by kickdown,RAM,0x5B96D0,external RAM,,u16,,,LIKELY,CONFIRMED,compared with 4*UPWGKDO/U
+nmot_w,engine speed 0.25 rpm/bit,RAM,0x5B9A26,external RAM,,u16,,,LIKELY,LIKELY,y input of KFPED (axis 1280..24000 = 320..6000 rpm) and many maps
+nmot (byte),engine speed byte (likely 40 rpm/bit),RAM,0x5B9001,external RAM,,u8,,,HYPOTHESIS,LIKELY,most-read byte; y axis of byte maps 10..163
+(driver wish),KFPED output (32768 = 100%),RAM,0x5B981A,external RAM,,u16,,,HYPOTHESIS,CONFIRMED,written only at INT 0x4637C
+(gear),current gear 0..6 used by flap map,RAM,0x5B92CA,external RAM,,u8,,,HYPOTHESIS,LIKELY,x input of 0x1D077C (7 points 0..6)
+(vehicle speed),vehicle-speed-like byte,RAM,0x5B90BB,external RAM,,u8,,,HYPOTHESIS,HYPOTHESIS,used as standstill threshold in flap and generator logic
+(segment index),current cylinder segment 0..7 (firing order),RAM,0x5B907C,external RAM,,u8,,,HYPOTHESIS,HIGH CONFIDENCE,INT 0x3033C from TPU tooth counter via fn 0x67A74 (mod 120 / 15)
+STATEAEVAB,AEVAB state machine state 0..5,RAM,0x5B92E8,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,INT fn 0x2C060 switch; also written EXT 0xF2BA50 (init)
+(AEVAB step),applied reduction step / cylinders to cut,RAM,0x5B92E6,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,8 if 0x3FBFEC else 0x5B93E7
+REDSOL (candidate),requested reduction step from torque ratio,RAM,0x5B93E7,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,INT fn 0x484F8; 0x5B93E6 holds unclamped rounded value
+(AEVAB phase),latched REDABM row,RAM,0x5B92E4,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,(0x5B907C+4) mod 8 at reduction start
+(AEVAB pattern mask),mask from REDABM (+ static masks),RAM,0x5B92E5,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,INT 0x2C580/0x2C710
+EVZ_AUS (candidate),final injector cut mask (bit=1 cut),RAM,0x5B92EA,external RAM,,u8,,,LIKELY,CONFIRMED,INT 0x2EF40 sets injection time 0 for set bits
+EVZ_AUSTOT (candidate),bit-coded total cutoff request word,RAM,0x5BBBA8,external RAM,,u16 bitfield,,,HYPOTHESIS,CONFIRMED,non-zero forces 0x5B92EA=0xFF (INT 0x430A4/0x431EC)
+(static cut mask),per-cylinder diagnostic mask | CWEVAB,RAM,0x5B88C5,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,EXT 0xF7BEE4; 0x5B88C4 = mask before CWEVAB
+(bank mask),firing-order positions on bank 2 (0x5A),RAM,0x5B8C82,external RAM,,u8 constant,,,HYPOTHESIS,CONFIRMED,EXT 0xFE4BF4 init
+(cut count),cylinders currently cut (total/bank A/bank B),RAM,0x5B92EC/0x5B92ED/0x5B92EE,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,INT fn 0x55424
+(bank cut flags),bank A / bank B has cut cylinders,RAM,0x3FBFFE/0x3FBFFF,internal SRAM,,u8 flags,,,HYPOTHESIS,CONFIRMED,INT fn 0x55424; consumed by lambda coordinator 0x5563C
+(lambda setpoint A/B),per-bank lambda setpoint (4096 = 1.0),RAM,0x5B96AA/0x5B96A8,external RAM,,u16,,,HYPOTHESIS,LIKELY,INT fn 0x5563C outputs; read widely
+(base torque),torque without intervention (divisor of step ratio),RAM,0x5B97DA,external RAM,,u16,,,HYPOTHESIS,LIKELY,written INT 0x461AC
+(target torque),intervention target torque (numerator of step ratio),RAM,0x3FC32A,internal SRAM,,u16,,,HYPOTHESIS,LIKELY,written INT 0x47E2C/0x47E38 and EXT 0xF2EBD8
+(exhaust flap command),flap actuator command,RAM,0x3FC286,internal SRAM,,u8,,,HYPOTHESIS,CONFIRMED,EXT fn 0xF97D8C
+fn AEVAB,injector shutoff state machine,code,0x2C060,internal flash,int 0x2C060,function,,,HIGH CONFIDENCE,CONFIRMED,uses REDABM; called from task fn 0x31B20 at 0x31B80
+fn AEVAB output,total cut override,code,0x2C860,internal flash,int 0x2C860,function,,,HYPOTHESIS,CONFIRMED,0x5BBBA8>0 -> 0xFF else 0x5B92E5
+fn step request,torque ratio -> cylinders to cut,code,0x484F8,internal flash,int 0x484F8,function,,,HYPOTHESIS,CONFIRMED,writes 0x5B93E7
+fn injection time per cylinder,applies cut mask; bank split 0x5A,code,0x2ED6C,internal flash,int 0x2ED6C,function,,,HYPOTHESIS,CONFIRMED,loop at 0x2EF24
+fn BBKD,kickdown detection,code,0x3B80C,internal flash,int 0x3B80C,function,,,HIGH CONFIDENCE,CONFIRMED,writes 0x3FBFB3
+fn driver wish,KFPED/KFMRMI/KFMIMR lookups,code,0x46348,internal flash,int 0x46348,function,,,HYPOTHESIS,CONFIRMED,
+fn lambda coordinator (bank),per-bank lambda setpoint incl. cylinder-cut substitution,code,0x5563C,internal flash,int 0x5563C,function,,,HYPOTHESIS,LIKELY,
+fn exhaust flap,flap decision,code,0xF97D8C,external flash,ext 0x97D8C,function,,,HYPOTHESIS,CONFIRMED,
+fn generator voltage,generator voltage request with mV limits,code,0xF8A9D0,external flash,ext 0x8A9D0,function,,,HYPOTHESIS,LIKELY,
+fn ignition angle,uses three 24x16 maps,code,0x49600,internal flash,int 0x49600,function,,,HYPOTHESIS,LIKELY,
+fn coolant target,two-level target map,code,0xF9E148,external flash,ext 0x9E148,function,,,HYPOTHESIS,LIKELY,
