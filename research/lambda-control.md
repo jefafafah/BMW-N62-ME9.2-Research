@@ -85,3 +85,56 @@ setpoint ≈ 0x1000 at warm idle.
 * Location of the lambda controller (P/I parts), adaptation (`fra`/`rka`-like) and measured λ.
 * `IMLEVABS` integrator; `KFLAMFA`; `KFDLASO`.
 * Whether `0x3FC2B6` is cut count, load or time since cut.
+
+---
+
+# Round 3 additions (2026-10-03)
+
+## 6. Measured lambda — CONFIRMED structure
+
+| Item | Address | Evidence | Status |
+|---|---|---|---|
+| Broadband sensor linearisation | CAL curve `0x1C6D0A` (22 points, u16) | x 55…708 (sensor signal) → y 3072…16384, with y = 4096 at x = 305: λ 0.75…4.0 | **CONFIRMED** curve; proves the 4096 = λ 1.000 scale (round-2 LIKELY → **HIGH CONFIDENCE**) |
+| Measured λ per bank | RAM `0x5B9708`, `0x5B970A` (+ `0x5B9700…0x5B9712`) | written only by INT fn `0x55A1C` (uses the curve above and inputs `0x3FE15C…0x3FE166`) | LIKELY (bank assignment open) |
+| Consumers of measured + target λ | INT `0x56DD0` (controller), `0x53C40`, EXT `0xF6C710`, `0xF8B778`, `0xFA2898`, `0xFB13A4`, `0xF6041C` (diagnostics/catalyst monitoring) | read both `0x5B96A8/AA` and `0x5B9708/0A` | LIKELY |
+
+## 7. Feedback controller — LIKELY
+
+INT fn `0x56DD0` reads setpoints `0x5B96A4/A6/A8/AA` and measured `0x5B9708/0A`. It writes the block
+`0x5B988C…0x5B98E6`, uses limits CAL `0x1C9986…0x1C9994` (0x1E00, 0x4000, 0xC000, 0x7FFF, 0x8000,
+0x199A) and map CAL `0x1C95A6` (5×4, x 64…184, y 1000…10000). Output factor `0x5B98A0` (and `0x5B98A2`)
+is consumed by the fuel calculation (below) and by catalyst/diagnostic functions. Separate P/I terms
+and the adaptation store are not yet split out.
+
+## 8. How the setpoint enters fueling — CONFIRMED
+
+INT fn `0x2E9E4` (fuel mass / injection-time base, same task as AEVAB):
+
+```text
+q   = (load << 12) / λ_setpoint(0x5B96A4)      # INT 0x2ECAC-0x2ECB0, divide helper 0x15E58
+q  *= controller factor 0x5B98A0               # INT 0x2ECBC (multiply helper 0x1DED0)
+q  += additive term (lha)                      # adaptation-like offset
+q  *= 0x5B96BA                                 # further multiplicative factor
+→ 0x5B9694 / 0x5B9690…0x5B9698
+```
+
+So the lambda **setpoint** is a true feed-forward divisor of fuel mass, and the closed-loop controller
+works around the snapped setpoint `0x5B96AA/A8`. The bank path B uses `0x5B96A6` the same way.
+
+## 9. Lean-cruise implication
+
+A mild lean target set at the setpoint level (`0x5B96B4/A2` before limits) would reduce fuel
+feed-forward **and** move the controller target together, so it would not fight the closed loop.
+Constraints found:
+* the min/max clamps `0x5B891C/0x5B891D` (×32) bound the setpoint;
+* the snap window (0.9985…1.0012) only affects targets near 1.0;
+* catalyst/diagnostic monitors (EXT `0xF6C710`, `0xF8B778`, `0xFB13A4`) read the setpoint and may
+  flag or suspend monitoring when λ ≠ 1 (not analysed).
+
+Status: mechanism CONFIRMED; suitability for lean cruise HYPOTHESIS (emissions/NOx and monitor
+behaviour unknown).
+
+## 10. Still open
+
+Full-load enrichment and protection enrichment sources inside the arbitration (INT `0x1A4F0` inputs
+`0x5B968C`, `0x5B969A…0x5B96A0`), the IMLEVABS integrator, and the adaptation memory.

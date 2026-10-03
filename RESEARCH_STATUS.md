@@ -1,6 +1,6 @@
 # Research status
 
-Last update: 2026-10-03 (static-analysis round 2).
+Last update: 2026-10-03 (static-analysis round 3).
 
 ## Confidence model
 
@@ -35,7 +35,7 @@ Last update: 2026-10-03 (static-analysis round 2).
 | Two-level coolant target map | LIKELY | scaling HYPOTHESIS |
 | Generator voltage request function | LIKELY | TGENOFVL not located |
 | Ignition maps (24×16 ×3) | LIKELY | roles HYPOTHESIS |
-| VANOS/Valvetronic, knock adaptation, measured λ/trims, sport flag, CAN IDs | not located | ROADMAP round 3 |
+| VANOS/Valvetronic, knock adaptation, fan/thermostat outputs, full-load/protection enrichment sources | not located | ROADMAP round 4 |
 | Cruise-control set-speed presets in DME | none found | 1 km/h step; breakpoints 30/50/70/100/130/200 km/h |
 | One global 560B → 770B offset | REJECTED | local deltas −0x84 … +0x118 |
 | OEM AEVAB rotates the pattern each cycle | REJECTED | phase latched per event |
@@ -54,6 +54,32 @@ reference dump).
 Names of RAM variables (Bosch labels), physical scalings, the identity of the intervention sources,
 everything under "not located", and all efficiency/mode proposals.
 
+
+## Round 3 status (CAN, modes, kickdown, lambda, generator, flap, thermal, AEVAB integration)
+
+| Item | Status | Notes |
+|---|---|---|
+| TouCAN driver: message-object table EXT `0xFDFAF4` (30 IDs), signal table EXT `0xFDF967`, read/write API INT `0x63660`/`0x63C3C` | CONFIRMED | `research/can-and-drive-modes.md`, `tools/me9_can.py` |
+| DME TX 0x0A8/0x0A9/0x0AA; RX EGS 0x0B5/0x0BA/0x1A2/0x5C3 (+ 16 other RX IDs, private TouCAN-B bus) | CONFIRMED | matches the E65 reference filter sets |
+| 0x192 (selector) and 0x1D2 received by the DME | REJECTED | not in the message table |
+| Current gear `0x5B92CA` from 0x0BA byte0 nibble via table INT `0x15984` | CONFIRMED | upgraded from LIKELY |
+| D/S/M program state inside the DME | LIKELY absent | no input, no consumer |
+| Sport driver-wish behaviour (KFPEDS-type) in 770B | LIKELY absent | `research/sport-mode.md` |
+| B_kd consumers: only CAN coder (→ 0x0AA byte6 high nibble = 0x0B) and diagnostics | CONFIRMED | `research/kickdown-path.md` |
+| 0x0AA content: rpm (bytes4-5, 0.25 rpm/bit), pedal byte3, kickdown state byte6 | CONFIRMED | |
+| Transmission oil temperature from 0x0B5 byte7 → `0x5B9229` | HIGH CONFIDENCE | exact unit conversion |
+| EGS driver-wish limit `0x3FBEDD` (0x0B5 byte5 bits6-7) | LIKELY | |
+| Turbine-speed candidate 0x1A2 → `0x5B9982` | LIKELY | |
+| λ scale 4096 = 1.0 (sensor curve `0x1C6D0A`) | HIGH CONFIDENCE | upgraded |
+| Fuel feed-forward divides by λ setpoint; controller factor `0x5B98A0` | CONFIRMED structure | lean target via setpoint is structurally clean |
+| TGENOFVL → `0x1C9412` (full-load-edge generator timer, stock 0) | LIKELY | |
+| Flap command `0x3FC286` → output channel 12 | CONFIRMED | polarity LIKELY "on = closed" |
+| `0x5B90BB` = vehicle speed (round 2) | REJECTED as stated; now HYPOTHESIS temperature | |
+| Least-invasive efficiency-request point: `max()` at AEVAB entry INT `0x2C088`, gated off during any OEM intervention | analysis (HYPOTHESIS) | `research/aevab-integration-points.md` |
+| Continuous 4/8 via injector cut keeps unfired cylinders pumping air (lean exhaust, NOx/cat risk) | engineering constraint | must be evaluated before any efficiency claim |
+
+Verification: `tools/verify_770b_findings.py` now runs 47 checks (31 round-2 + 16 round-3); all pass on the reference dump.
+
 ## Round-2 input limitation
 
 The third-party 560B bin/XDF and 725D A2L were not re-opened in round 2. 560B-based names rely on
@@ -68,4 +94,4 @@ the offsets/descriptions recorded in round 1 (`research/reference-symbols.csv`).
 `research/verified-findings.md`, `research/symbol-map-770B.csv`, `research/560B-to-770B-mapping.md`,
 `research/aevab-redabm.md`, `research/lambda-control.md`, `research/torque-and-modes.md`,
 `research/generator-control.md`, `research/exhaust-flap.md`, `research/thermal-management.md`,
-`research/ignition-vanos-valvetronic.md`, `research/egs-integration-plan.md`.
+`research/ignition-vanos-valvetronic.md`, `research/egs-integration-plan.md`, `research/can-and-drive-modes.md`, `research/sport-mode.md`, `research/kickdown-path.md`, `research/dme-egs-interface.md`, `research/aevab-integration-points.md`.

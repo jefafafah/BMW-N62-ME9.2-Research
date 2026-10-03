@@ -14,6 +14,11 @@ Round 2 (ME9.2 770B, CPU address space; needs Python ≥ 3.9, `capstone` only fo
 - `me9_tables.py` — catalogues curve/map records from lookup-helper call sites and writes CSV with geometry and axis ranges only, never table values.
 - `verify_770b_findings.py` — re-checks every round-2 CONFIRMED claim against local dumps at operand level (no firmware bytes embedded); exits non-zero on failure.
 
+Round 3:
+
+- `me9_can.py` — dumps the CAN message-object table (ID, direction, controller, DLC) and the signal table; `--users` lists the functions reading/writing each signal.
+- `me9_callgraph.py` — `callees`/`callers` trees and `consumers <RAM address>` (functions touching an address, with their callers).
+
 Images are passed as `--int/--ext` or via `ME9_INT`/`ME9_EXT`, e.g.
 
 ```sh

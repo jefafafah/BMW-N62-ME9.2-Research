@@ -22,3 +22,13 @@ No full dump or EEPROM is committed to this repository.
 - Public BMW ME9 XDF/A2L/DAMOS-derived definitions used strictly as external research references.
 
 If a source is later included directly in this repository, its redistribution/license status must be documented first.
+
+## Round 3 reference (CAN)
+
+- damienmaguire, **BMW-E65-CANBUS**: <https://github.com/damienmaguire/BMW-E65-CANBUS>. It holds PT-CAN
+  captures from an E65 735i, SavvyCAN filter sets (`dme_msgs.ftl`, `egs_msgs.ftl`, `dme_egs_msgs.ftl`)
+  and an Arduino sketch (`E65_PTCAN.ino`). Cloned locally for comparison only; nothing from it is
+  redistributed here.
+  - Used as evidence: which IDs appear in the DME vs EGS filter sets (direction cross-check).
+  - Confirmed against the 770B message table: 0x0A8/0x0A9/0x0AA are DME transmit; 0x0B5/0x0BA/0x1A2/0x5C3 are DME receive (EGS-originated).
+  - Not confirmed / contradicted by 770B: 0x192 and 0x1D2 are **not** received by the DME; the sketch's comment calling 0x0AA a transmission frame is wrong (the DME builds it, with rpm×4 in bytes 4-5); the 500 kbit/s bitrate is not yet derived from the TouCAN setup.

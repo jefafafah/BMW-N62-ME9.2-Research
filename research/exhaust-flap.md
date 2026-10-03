@@ -12,7 +12,7 @@ elif (cw.bit4 || 0x3FE954) &&
      hyst(0x5B9307; on 0x1D07E9=13, off 0x1D07EB=11) ? (0x5B953E < 0x1D07E6) : (0x5B90BB < 0x1D07ED):
                                        out := 0
 elif cw.bit0 && 0x3FC0D4:             out := cw.bit3
-elif 0x5B90BB <= 0x1D07EC (=0):       out := cw.bit2         # standstill value
+elif 0x5B90BB <= 0x1D07EC (=0):       out := cw.bit2         # low-value branch (round 2 said "standstill"; 0x5B90BB is now thought to be a temperature)
 else:
     pedal := 0x3FC188 ? 0x5B9822 : 0x5B96D8                    # cruise-equivalent vs. real pedal
     thr   := KFAKR_GANG[gear 0x5B92CA][rpm byte 0x5B9001]      # map 0x1D077C, 7×12 u8
@@ -61,3 +61,41 @@ no flash image is produced.
 ## 3. Logging
 
 `0x3FC286` (command), `0x5B92CA` (gear), `0x5B9001` (rpm byte), `0x5B96D8` (pedal), `0x3FC188`.
+
+---
+
+# Round 3 additions (2026-10-03)
+
+## 4. Output path and polarity
+
+* `0x3FC286` drives **digital output channel 12** directly: INT `0x38C0C…0x38C1C`
+  (`r3 = 0xC, r4 = 1, r5 = 0x3FC286`, `bl 0xAC00`). CONFIRMED.
+* It is also packed into a diagnostic status byte (EXT `0xF1BDFC`) and monitored by EXT `0xF72F40`.
+* Polarity: `out = 1` at standstill (CW bit2), at low pedal and at low rpm in high gears, and `0` at
+  high pedal/high rpm. With a vacuum-actuated flap, the likely reading is **output on = flap closed**.
+  Status: LIKELY (needs a bench/car check).
+
+## 5. Exact inputs (complete list from the function)
+
+| Input | Role |
+|---|---|
+| `0x3FC102`, `0x3FC103`, `0x3FC104` | override/actuator-test path |
+| CAL `0x1D07E8` (CW = 0x14) | bit0: forced-value enable with `0x3FC0D4`; bit2: standstill value; bit3: forced value; bit4: enable temperature-gated branch; bit5: invert |
+| `0x3FE954` | alternative enable of the gated branch |
+| `0x5B9307` with hysteresis CAL `0x1D07E9`/`0x1D07EB` (13/11) | engine-temperature gate (`0x5B9307` is the engine temperature that also serves as fallback for transmission temperature) — LIKELY cold-engine condition |
+| `0x5B953E` vs CAL `0x1D07E6`; `0x5B90BB` vs CAL `0x1D07ED`/`0x1D07EC` | further gates (`0x5B90BB` temperature-like, see generator note) |
+| `0x3FC188` | pedal source: cruise-equivalent `0x5B9822` vs pedal `0x5B96D8` |
+| gear `0x5B92CA` (from CAN 0x0BA), rpm byte `0x5B9001` | map `0x1D077C` axes |
+| CAL `0x1D07EA` (12) | pedal hysteresis |
+
+No sport/program input exists (none is received; see `sport-mode.md`). Gear dependence comes only
+through `0x5B92CA`.
+
+## 6. Mode concept mapping (analysis only)
+
+| Desired | Existing means | Needed |
+|---|---|---|
+| E: quiet / OEM | stock map | nothing |
+| D: OEM or slightly earlier | recalibrate `0x1D077C` | affects all modes |
+| S/M: open in normal running | no mode input | new mode variable selecting a second threshold map (or forcing `out=0`), inserted at EXT `0xF97F0C` |
+| E + kickdown: power behaviour | B_kd `0x3FBFB3` is not used by the flap. At kickdown the pedal is 100 % (pedal>>8 = 255), which is ≥ every map entry (max 254) | the flap should already open at full pedal in every gear, subject to the hysteresis helper `0x1E74C` semantics. LIKELY no change needed |

@@ -132,3 +132,19 @@ in `mpc555-6.bin` (equal to its CPU address); *RAM* = runtime address, not in an
 | Ignition maps `0x1CAD5A/0x1CAF04/0x1CB186` (24×16) in fn `0x49600` | LIKELY | `ignition-vanos-valvetronic.md` |
 | One global 560B → 770B offset | REJECTED (deltas −0x84 … +0x118) | `560B-to-770B-mapping.md` |
 | 725D A2L addresses usable directly in 770B | REJECTED | same |
+
+---
+
+# Round 3 (2026-10-03) — CAN, modes, kickdown, lambda, generator, flap
+
+16 further checks were added to `tools/verify_770b_findings.py` (47/47 pass on the reference dump):
+CAN message table (30 objects; EGS RX 0x0B5/0x0BA/0x1A2/0x5C3; DME TX 0x0A8/0x0A9/0x0AA; 0x192/0x1D2
+absent), signal 0x11 → gear decode, gear-code table INT `0x15984`, gear `0x5B92CA` assignment, B_kd →
+`0x5B902B = 0x0B` → 0x0AA byte6, rpm → 0x0AA bytes4-5, transmission-temperature conversion, λ sensor
+curve `0x1C6D0A` (4096 = 1.0), measured-λ writers, fuel division by λ setpoint, the full-load generator
+timer at `0x1C9412`, and the flap output channel. Details: `can-and-drive-modes.md`, `kickdown-path.md`,
+`dme-egs-interface.md`, `sport-mode.md`, `aevab-integration-points.md` and the round-3 sections of
+`lambda-control.md`, `generator-control.md`, `exhaust-flap.md`, `thermal-management.md`.
+
+Correction: `0x5B90BB` was listed as "speed-like" in round 2; its thresholds (0xE0, 0xF0) indicate a
+temperature-like quantity (HYPOTHESIS).

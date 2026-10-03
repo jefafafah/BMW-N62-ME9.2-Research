@@ -25,7 +25,7 @@
 4. Static masks `0x5B8FD1` (fn `0xF37E34`) and `0x5B90D8`; the `0x3FC234`/`0x5B90F9` path.
 5. Locate AEVABU, AEVABZK, IMLEVABS, KFLAMFA, KFDLASO, TGENOFVL.
 6. Lambda controller, adaptation and measured λ (follow consumers of `0x5B96AA/0x5B96A8`).
-7. Sport-mode flag and CAN message map: decode the TouCAN message-buffer configuration used by INT `0x62704`/EXT `0xF09D0C`.
+7. ~~Sport-mode flag and CAN message map~~ — done in round 3 (`research/can-and-drive-modes.md`); no sport flag exists in the DME.
 8. VANOS/Valvetronic maps (candidates `0x1C21AC`, `0x1C2500`, `0x1C2636`), knock adaptation, fan PWM (MIOS).
 9. Physical scalings: λ 4096 = 1.0, rpm 0.25/bit, rpm byte 40/bit, temperature 0.75 °C − 48, speed 1/128 km/h. Confirm each with a live log.
 
@@ -74,7 +74,7 @@
 ## Phase 6 — ZF 6HP EGS integration
 
 - [ ] Obtain and identify the exact EGS software.
-- [ ] Reverse engineer D/S/M status and DME <-> EGS torque messages.
+- [~] Reverse engineer D/S/M status and DME <-> EGS torque messages (round 3: DME side decoded; D/S/M not present in DME; 0x0A8/0x0A9 torque fields still open).
 - [ ] Tune low-load shift schedule, hysteresis and TCC strategy.
 - [ ] Integrate E-mode shift programme.
 - [ ] Validate NVH with 6/8 and 4/8 firing, especially with locked converter.
@@ -87,3 +87,21 @@
 - A/C and generator load shedding during transient acceleration.
 - Thermal target selection by drive mode.
 - CAN-driven E-mode indicator and OEM-like UI integration.
+
+## Round 4 — open questions and next experiments
+
+Static:
+1. Decode 0x0A8/0x0A9 torque fields in the TX builder INT `0x4B128` (inputs `0x5B94C6…0x5B94D2`, `0x5BBA56…`).
+2. Trace the CAN origin of the AEVAB enable flags `0x3FBF34/0x3FBF38` (fn INT `0x404D4`) and `0x3FC1A3`/`0x3FC195`, in particular whether DSC frames (0x0B6/0x0CE/0x19E/0x1A0, decoder INT `0x5B988`) feed them.
+3. Derive the PT-CAN bitrate from the TouCAN CTRL1/PRESDIV initialisation.
+4. Enumerate `bl 0xAC00` output-channel calls (flap = channel 12) to find the thermostat heater and fan outputs.
+5. Split the lambda controller (INT `0x56DD0`) into P/I/adaptation; locate full-load and protection enrichment inputs of INT `0x1A4F0`.
+6. Confirm the meaning of `0x5B90BB` and `0x5B9307` (temperatures?) from their writers.
+7. Re-check TGENOFVL/LASOABML/KFMIMR/KFMRMI names against a locally supplied 560B XDF.
+
+In-car / bench (read-only first):
+1. PT-CAN capture with the selector cycled P-R-N-D-S-M and M-gate taps, correlated with `0x5B92CA`, `0x3FBEE0/DF`, `0x5B8F72`, `0x5B8F73`, `0x3FBEDB/DC`.
+2. Kickdown: confirm 0x0AA byte6 high nibble = 0xB exactly while `0x3FBFB3` = 1.
+3. Converter: correlate 0x1A2 (`0x5B9982`) with engine speed during lock/unlock.
+4. Flap polarity on output channel 12.
+5. AEVAB during DSC/EGS interventions (`0x5B93E7`, `0x5B92EA`, `0x3FBF34/38`), plus exhaust λ/catalyst temperature during any cut event.

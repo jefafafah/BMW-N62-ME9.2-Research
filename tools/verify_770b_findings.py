@@ -125,6 +125,39 @@ def main() -> int:
     check(any(p in (0xF9E484, 0xF9E4D0) and t == 0x179E8 and r.get(3) == 0x1D08A8 for p, t, r in calls),
           "two-level coolant-target map candidate 0x1D08A8 looked up in fn 0xF9E148")
 
+    # --- round 3: CAN, kickdown propagation, lambda, generator, flap ----------
+    from me9_can import message_objects
+
+    msgs = message_objects(img)
+    by_id = {(m["can_id"], m["tx"]): m for m in msgs.values()}
+    check(len(msgs) == 30, f"CAN message-object table at 0xFDFAF4 holds 30 objects ({len(msgs)})")
+    check(all((i, False) in by_id for i in (0x0B5, 0x0BA, 0x1A2, 0x5C3)), "EGS frames 0x0B5/0x0BA/0x1A2/0x5C3 configured as DME receive (TouCAN A)")
+    check(all((i, True) in by_id and by_id[(i, True)]["controller"] == 0 for i in (0x0A8, 0x0A9, 0x0AA)), "0x0A8/0x0A9/0x0AA configured as DME transmit on TouCAN A")
+    check(not any(m["can_id"] in (0x192, 0x1D2) for m in msgs.values()), "0x192 (selector lever) and 0x1D2 (gear display) are NOT in the DME message table")
+    check(img.read(0xFDF967 + 5 * 0x11, 5) == bytes([0x11, 0x0D, 2, 0, 32]) and touched(0x5B8F71, 0x39394, "W"),
+          "signal 0x11 = 0x0BA bytes 0-3, decoded in INT fn 0x392C8 into gear 0x5B8F71")
+    check(list(img.read(0x15984, 11)) == [0, 0, 7, 0, 0, 1, 2, 3, 4, 5, 6], "0x0BA gear-code table INT 0x15984: codes 5..10 -> gears 1..6, code 2 -> 7")
+    check(touched(0x5B8F71, 0x5E358) and touched(0x5B92CA, 0x5E35C, "W"), "current gear 0x5B92CA := 0x5B8F71 when EGS present (0x3FBED1)")
+    check(dform(img, 0xFA9070) == (14, 12, 0, 0x0B) and touched(0x5B902B, 0xFA9074, "W") and touched(0x3FBFB3, 0xFA9064),
+          "B_kd -> pedal/kickdown state 0x5B902B = 0x0B (EXT fn 0xFA8E70)")
+    check(touched(0x5B902B, 0x4BAF0) and any(p == 0x4BB1C and t == 0x63C3C and r.get(3) == 0x33 for p, t, r in calls),
+          "0x5B902B packed into 0x0AA byte 6 bits 4-7 (signal 0x33) by TX builder INT 0x4B128")
+    check(touched(0x5B9A26, 0x4B950) and touched(0x3F9C24, 0x4B954, "W"), "engine speed 0x5B9A26 (0.25 rpm/bit) is the 0x0AA bytes 4-5 source")
+    check(dform(img, 0x397C4) == (14, 11, 11, 8) and dform(img, 0x397CC) == (14, 10, 0, 3) and touched(0x5B9229, 0x397D4, "W"),
+          "0x0B5 byte 7 -> transmission temperature 0x5B9229 = (raw+8)*4/3 (raw-40 degC into 0.75 degC/-48 format)")
+    t = 0x1C6D0A
+    xs = [img.u16(t + 2 + 2 * i) for i in range(22)]
+    ys = [img.u16(t + 2 + 44 + 2 * i) for i in range(22)]
+    check(img.u16(t) == 22 and ys[xs.index(305)] == 4096 and ys[0] == 3072 and ys[-1] == 16384,
+          "broadband-lambda linearisation curve 0x1C6D0A: y = 0x1000 at the stoichiometric point (4096 = lambda 1.0)")
+    check(touched(0x5B9708, 0x56310, "W") and touched(0x5B970A, 0x55CFC, "W"), "measured lambda per bank 0x5B9708/0x5B970A written by INT fn 0x55A1C")
+    check(touched(0x5B96A4, 0x2ECAC) and any(p == 0x2ECB0 and t2 == 0x15E58 for p, t2, r in calls) and touched(0x5B98A0, 0x2ECBC),
+          "fuel calc INT 0x2E9E4 divides by lambda setpoint 0x5B96A4 then applies controller factor 0x5B98A0")
+    check(is_r2_ref(img, 0xF47F40, 0x1C9412) and touched(0x5B90EB, 0xF47F68, "W") and touched(0x5B8F26, 0xF47E94),
+          "generator timer: 0x1C9412 loaded on full-load (0x5B8F26) edge, running flag 0x5B90EB -> fn 0xF8A648")
+    check(touched(0x3FC286, 0x38C10) and dform(img, 0x38C14) == (14, 3, 0, 0xC) and any(p == 0x38C1C and t2 == 0xAC00 for p, t2, r in calls),
+          "exhaust-flap command 0x3FC286 drives output channel 12 (INT 0x38C1C, bl 0xAC00)")
+
     for ok, text in results:
         print(f"[{'PASS' if ok else 'FAIL'}] {text}")
     failed = sum(1 for ok, _ in results if not ok)
