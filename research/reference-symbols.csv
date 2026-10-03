@@ -1,0 +1,30 @@
+symbol,reference,reference_address,description,status
+REDABM,560B XDF,0x54A0,Injector shutoff pattern for torque reduction,CONFIRMED
+CWEVAB,560B XDF,0xD8B4,Codeword for injector shutoff,CONFIRMED
+UPWGKDO,560B XDF,0x1ECE,Upper kickdown potentiometer threshold,CONFIRMED
+UPWGKDU,560B XDF,0x1ECF,Lower kickdown potentiometer threshold,CONFIRMED
+WPKDMN,560B XDF,0x1ED0,Minimum pedal value for kickdown detection,CONFIRMED
+KFMIMR,560B XDF,0x8506,Pedal-overtravel torque increase map,CONFIRMED
+KFMRMI,560B XDF,0x85F6,Relative indicated-torque increase in pedal overtravel,CONFIRMED
+KFPED,560B XDF,0x86E6,Relative driver-wish torque from accelerator pedal,CONFIRMED
+MDHYEZ,560B XDF,0x8902,Torque hysteresis for cylinder blanking decision,CONFIRMED
+TGENOFVL,560B XDF,0x92FA,Generator shutoff time during full-load acceleration,CONFIRMED
+IMLEVABS,560B XDF,0x98AA,Integrated air-mass threshold before lambda control after cylinder blanking,CONFIRMED
+LASOABML,560B XDF,0x6349,Lambda setpoint during bank shutoff,CONFIRMED
+KFDLASO,560B XDF,0x12C5,Lambda setpoint correction for continuous lambda control,CONFIRMED
+KFLAMFA,560B XDF,0xE0AE,Driver-wish lambda map,CONFIRMED
+CWAKR,560B XDF,0xD2827,Exhaust-flap-control codeword,CONFIRMED
+KFAKR_GANG,560B XDF,0x10655,Exhaust-flap activation by gear/RPM logic,CONFIRMED
+KFPEDS,725D A2L,0xFC9EB2,Sport-mode relative driver-wish torque map,CONFIRMED
+B_sptvar,725D A2L,runtime,Condition sport button present,CONFIRMED
+B_kd,725D A2L,runtime,Kickdown condition,CONFIRMED
+BRABEVI2,725D A2L,0xFD05DA,Sport acceleration ramp,CONFIRMED
+BRAWAVI2,725D A2L,0xFD06EA,Sport resume ramp,CONFIRMED
+KFZDASHS,725D A2L,0xFD3BEA,Sport-mode dashpot PT1 filter,CONFIRMED
+KFMIRL,725D A2L,0xFC5C40,Requested filling/load calculation map,CONFIRMED
+KFMIOP,725D A2L,0xFC977C,Optimal engine torque map,CONFIRMED
+KFZWOP,725D A2L,0xFC934E,Optimal ignition angle,CONFIRMED
+KFWESOPU,725D A2L,0xFCD226,Optimal warm unthrottled inlet cam spread,CONFIRMED
+KFWASOPU,725D A2L,0xFCD076,Optimal warm unthrottled exhaust cam spread,CONFIRMED
+KFWESVL,725D A2L,0xFCD52A,Full-load inlet cam spread vs RPM and knock intensity,CONFIRMED
+KFWASVL,725D A2L,0xFCD3BC,Full-load exhaust cam spread vs RPM and knock intensity,CONFIRMED

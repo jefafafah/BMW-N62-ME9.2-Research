@@ -1,0 +1,30 @@
+# Vehicle-specific / proprietary binary material
+*.bin
+*.BIN
+*.eeprom
+*.eep
+*.hex
+*.s19
+*.rar
+*.zip
+*.7z
+*.ols
+*.kp
+*.a2l
+
+# Dumps / logs that may contain identifiers
+raw/
+dumps/
+private/
+logs/private/
+
+# Python / tooling
+__pycache__/
+*.pyc
+.venv/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
