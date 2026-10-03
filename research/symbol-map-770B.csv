@@ -100,3 +100,19 @@ fn CAN torque words,converts internal torques for 0x0A8/0x0A9/0x0AA,code,0x4BDDC
 (max torque candidate),maximum available torque (0x0A9 bits 28-39),RAM,0x5B9854,external RAM,,u16,,,HYPOTHESIS,LIKELY,written EXT 0xFA4F30 (full-load fn 0xFA4D04)
 (driver request torque),0x0AA bits 12-23,RAM,0x5B980A,external RAM,,u16,,,HYPOTHESIS,LIKELY,INT 0x467F0; 0 in overrun cut
 (generator reduction flag),full-load/timer generator relief flag,RAM,0x5B8F2D,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,EXT 0xF8A950 -> read EXT 0xF8A9F4
+fn PWM API,"application PWM set (logical ch, duty 0.01%)",code,0x671AC,internal flash,int 0x671AC,function,,,HIGH CONFIDENCE,CONFIRMED,"logical table INT 0x156AC, driver list INT 0x1579C"
+(PWM logical channel table),"10 PWM channels: hw channel, period, driver",code-data,0x156AC,internal flash,int 0x156AC,24-byte records,,,HYPOTHESIS,CONFIRMED,VANOS candidates logical 2/7/3/6 -> MIOS hw 0x0C/0x0B/0x1E/0x1F
+fn VANOS main loop,"4 actuator objects: capture, target, estimate, PI, output",code,0x3FBAC,internal flash,int 0x3FBAC,function,,,HIGH CONFIDENCE,CONFIRMED,objects INT 0x1BC9C + 0x78*i
+fn VANOS target composer,builds target bytes 0x5B911A / 0x5B910F from 14 maps,code,0x3DA70,internal flash,int 0x3DA70,function,,,HIGH CONFIDENCE,CONFIRMED,
+fn VANOS target writer,"target = byte x8 per actuator type, or fixed",code,0x3EF24,internal flash,int 0x3EF24,function,,,HYPOTHESIS,CONFIRMED,
+fn VANOS controller,PI-type position loop,code,0x3F848,internal flash,int 0x3F848,function,,,HYPOTHESIS,CONFIRMED,error = +0x38 - +0x30
+(VANOS objects),4 x 0x78-byte descriptors,code-data,0x1BC9C,internal flash,int 0x1BC9C,4 records,,,HYPOTHESIS,CONFIRMED,objects 0/2 and 1/3 share calibration sets
+(VANOS target obj0..3),target position,RAM,0x5B8DCC/0x5B8DA8/0x5B8DBA/0x5B8D96,external RAM,,u16,,,HYPOTHESIS,CONFIRMED,written INT 0x3EF24
+(VANOS measured obj0..3),measured cam position,RAM,0x5B8DCA/0x5B8DA6/0x5B8DB6/0x5B8D92,external RAM,,u16,,,HYPOTHESIS,CONFIRMED,written INT 0x3F3B8; read by air-mass/torque/Valvetronic models
+(VANOS duty obj0..3),PWM duty 0.01%,RAM,0x5B8DCE/0x5B8DAA/0x5B8DBC/0x5B8D98,external RAM,,u16,,,HYPOTHESIS,CONFIRMED,
+(VANOS target bytes),target type A (obj 0/2) / type B (obj 1/3),RAM,0x5B911A/0x5B910F,external RAM,,u8 (x8),,,HYPOTHESIS,CONFIRMED,composed in INT 0x3DA70
+(VANOS target maps A),7 x 12x12 u8 target-family maps for obj 0/2,calibration,"0x1C9E6C,0x1CA1CC,0x1C9C2C,0x1CA2EC,0x1C9F8C,0x1CA25C,0x1C9EFC",CAL alias,ext 0xC9xxx-0xCAxxx,12x12 u8 (group axes),,,HYPOTHESIS,CONFIRMED (lookup),"axes: rpm curve 0x1CA83C, load curve 0x1CA856"
+(VANOS target maps B),7 x 12x12 u8 target-family maps for obj 1/3,calibration,"0x1C9CBC,0x1CA01C,0x1C9B9C,0x1CA13C,0x1C9DDC,0x1CA0AC,0x1C9D4C",CAL alias,ext 0xC9xxx-0xCAxxx,12x12 u8 (group axes),,,HYPOTHESIS,CONFIRMED (lookup),
+(cam angle idx0..3),measured cam edge angle,RAM,0x5B9C9A/0x5B9C96/0x5B9C98/0x5B9C94,external RAM,,u16 (<=7200),,,HYPOTHESIS,CONFIRMED,writers INT 0x2F7AC/0x2FA78/0x2FD44/0x30010
+(cam edge TPU channels),TPU A ch 9..12 edge objects,code-data,0x1AB2C,internal flash,int 0x1AB2C,4 x 12-byte,,,HYPOTHESIS,CONFIRMED,selected by CAL 0x1C6DAA (=4); link to cam fns LIKELY
+fn output-stage test,"toggles MIOS 0x306086, reads ch 0x1C status, sets fault flags",code,0xF36FE8,external flash,ext 0x36FE8,function,,,HYPOTHESIS,CONFIRMED,REJECTED as VANOS

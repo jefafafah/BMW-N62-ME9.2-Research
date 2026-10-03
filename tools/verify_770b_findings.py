@@ -192,6 +192,35 @@ def main() -> int:
     check(touched(0x5B90EB, 0xF8A92C) and is_r2_ref(img, 0xF8A910, 0x1C940A) and touched(0x5B8F2D, 0xF8A950, "W") and touched(0x5B8F2D, 0xF8A9F4),
           "generator chain: timer flag 0x5B90EB -> reduction flag 0x5B8F2D (enable CAL 0x1C940A) -> voltage-request fn EXT 0xF8A9D0")
 
+    # --- round 5: VANOS -------------------------------------------------------
+    pwm = {i: img.read(0x156AC + 24 * i, 24) for i in range(10)}
+    check([int.from_bytes(pwm[i][4:8], "big") for i in (2, 7, 3, 6)] == [0x0C, 0x0B, 0x1E, 0x1F] and all(pwm[i][0xD] == 0 for i in (2, 3, 6, 7)),
+          "PWM logical channels 2/7/3/6 (INT table 0x156AC) map to MIOS hardware channels 0x0C/0x0B/0x1E/0x1F, driver index 0")
+    check([dform(img, a)[3] for a in (0x4FAD8, 0x4FAE8, 0x4FAF8, 0x4FB08)] == [2, 7, 3, 6]
+          and sum(1 for p, t2, r in calls if 0x4FA8C <= p < 0x4FB24 and t2 == 0x671AC) == 4,
+          "INT 0x4FA8C maps actuator index 0/1/2/3 to PWM logical channels 2/7/3/6 via PWM API INT 0x671AC")
+    check(any(p == 0x3FC7C and t2 == 0x3F0B4 for p, t2, r in calls) and dform(img, 0x3FC00)[3] == -0x4364 and dform(img, 0x3FC88)[3] == 4,
+          "INT 0x3FBAC loops over 4 actuator objects at INT 0x1BC9C (stride 0x78) and drives each through INT 0x3F0B4")
+    objs = [0x1BC9C + 0x78 * i for i in range(4)]
+    check([img.u32(o + 0x30) for o in objs] == [0x5B8DCC, 0x5B8DA8, 0x5B8DBA, 0x5B8D96]
+          and [img.u32(o + 0x2C) for o in objs] == [0x5B8DCA, 0x5B8DA6, 0x5B8DB6, 0x5B8D92]
+          and [img.u32(o + 0x10) for o in objs] == [0x5B8DCE, 0x5B8DAA, 0x5B8DBC, 0x5B8D98]
+          and [img.u8(o + 0x74) for o in objs] == [0, 1, 2, 3],
+          "VANOS-candidate objects: target (+0x30), measured position (+0x2C), duty (+0x10) RAM pointers")
+    check(img.u32(objs[0] + 0x44) == img.u32(objs[2] + 0x44) == 0x1D0618 and img.u32(objs[1] + 0x44) == img.u32(objs[3] + 0x44) == 0x1D0613,
+          "objects 0/2 share one calibration set, objects 1/3 another (two actuator types x two instances)")
+    check(img.u32(0x3F864) == 0x819F0030 and img.u32(0x3F884) == 0x819F0038 and img.u32(0x3F88C) == 0x7FDD6050,
+          "controller INT 0x3F848: error = estimated position (+0x38) - target (+0x30)")
+    check(touched(0x5B910F, 0x3EF50) and touched(0x5B911A, 0x3EF60) and img.u32(0x3EFEC) == 0x81830030,
+          "target writer INT 0x3EF24: odd objects use byte 0x5B910F x8, even objects 0x5B911A x8, stored via +0x30")
+    maps = sorted(r.get(3) for p, t2, r in calls if 0x3DA70 <= p < 0x3EF24 and t2 == 0x191B0)
+    check(maps == [0x1C9B9C + 0x90 * i for i in range(14)],
+          "VANOS target fn INT 0x3DA70 reads fourteen 12x12 byte maps CAL 0x1C9B9C..0x1CA2EC (group axes)")
+    check(touched(0x5B9C9A, 0x4F488) and touched(0x5BA058, 0x4F92C) and touched(0x5B9C9A, 0x2F7D4) and touched(0x5BA058, 0x2F810, "W"),
+          "cam capture: index-0 angle 0x5B9C9A and timestamp 0x5BA058 written by INT 0x2F7AC, read via INT 0x4F42C/0x4F904")
+    check(dform(img, 0xF1206C)[3] == 0x4800 and touched(0x306086, 0xF1207C, "W"),
+          "EXT 0xF12018 only switches MIOS register 0x306086 (0x4800/0x4000): not a duty writer (round-5 rejection)")
+
     for ok, text in results:
         print(f"[{'PASS' if ok else 'FAIL'}] {text}")
     failed = sum(1 for ok, _ in results if not ok)

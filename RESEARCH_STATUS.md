@@ -1,6 +1,6 @@
 # Research status
 
-Last update: 2026-10-03 (static-analysis round 4).
+Last update: 2026-10-03 (static-analysis round 5, VANOS).
 
 ## Confidence model
 
@@ -93,7 +93,7 @@ Verification: `tools/verify_770b_findings.py` now runs 47 checks (31 round-2 + 1
 | Forcing closed loop during sustained skip-fire would enrich active cylinders (factor limit 1.25) | HYPOTHESIS (consequence) | |
 | Valvetronic: DME sends one lift request per bank on private CAN 0x105/0x10D | CONFIRMED (DME side) | no per-cylinder lift; `research/valvetronic.md` |
 | Valvetronic target maps (main `0x1C47E8` etc.) | LIKELY / HYPOTHESIS roles | |
-| VANOS | not located; round-2 candidates REJECTED (air-charge model) | `research/vanos.md` |
+| VANOS | located in round 5 (see below) | `research/vanos.md` |
 | Knock / fuel-quality adaptation | not located | `research/ignition-knock-fuel-quality.md` |
 | Full-load λ request `0x5B891A` (KFLAMFA candidate `0x1CE1BC`), component protection `0x5B9C2E` | LIKELY / HYPOTHESIS | `research/full-load-enrichment.md` |
 | 0x0A8/0x0A9 torque fields (positions), converter formula | CONFIRMED positions; names LIKELY/HYPOTHESIS | `research/dme-egs-interface.md` |
@@ -103,6 +103,22 @@ Verification: `tools/verify_770b_findings.py` now runs 47 checks (31 round-2 + 1
 | Sustained 4/8 or 6/8 firing density as an efficiency measure | not supported by OEM lambda/valve design; benefit doubtful | `research/firing-density-feasibility.md` |
 
 Verification: 62 checks (31 + 16 + 15), all pass on the reference dump.
+
+
+## Round 5 status (VANOS only)
+
+| Item | Status | Notes |
+|---|---|---|
+| PWM API INT `0x671AC` + logical table INT `0x156AC` (10 channels) | CONFIRMED | |
+| VANOS subsystem: 4 actuators on PWM logical 2/7/3/6 (MIOS hw 0x0C/0x0B/0x1E/0x1F), main loop INT `0x3FBAC`, objects INT `0x1BC9C` | CONFIRMED structure, name HIGH CONFIDENCE | |
+| Position loop: target `+0x30`, measured `+0x2C`, extrapolated `+0x38`, duty `+0x10` per object | CONFIRMED | |
+| Two actuator types × two instances (objects 0/2 vs 1/3) | CONFIRMED structure | intake/exhaust and bank assignment open |
+| Targets from two families of seven 12×12 maps (CAL `0x1C9B9C…0x1CA2EC`), rpm × load group axes | CONFIRMED lookups; roles HYPOTHESIS | |
+| Cam angles `0x5B9C94…0x5B9C9A` from INT `0x2F7AC…0x30010`; TPU A ch 9–12 edge capture | CONFIRMED / LIKELY (link) | |
+| EXT `0xF36FE8`/`0xF12018` as VANOS | REJECTED | output-stage test |
+| INT `0xA558` as PWM | REJECTED | discrete port fields |
+
+Verification: 72 checks (62 + 10), all pass.
 
 ## Round-2 input limitation
 
