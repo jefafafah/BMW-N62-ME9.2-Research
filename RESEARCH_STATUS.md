@@ -1,6 +1,6 @@
 # Research status
 
-Last update: 2026-10-03 (static-analysis round 5, VANOS).
+Last update: 2026-10-03 (static-analysis round 6, 0x1A2 speed / ratio path).
 
 ## Confidence model
 
@@ -69,7 +69,7 @@ everything under "not located", and all efficiency/mode proposals.
 | 0x0AA content: rpm (bytes4-5, 0.25 rpm/bit), pedal byte3, kickdown state byte6 | CONFIRMED | |
 | Transmission oil temperature from 0x0B5 byte7 → `0x5B9229` | HIGH CONFIDENCE | exact unit conversion |
 | EGS driver-wish limit `0x3FBEDD` (0x0B5 byte5 bits6-7) | LIKELY | |
-| Turbine-speed candidate 0x1A2 → `0x5B9982` | LIKELY | |
+| Turbine-speed candidate 0x1A2 → `0x5B9982` | LIKELY | round 6: output speed REJECTED, see below |
 | λ scale 4096 = 1.0 (sensor curve `0x1C6D0A`) | HIGH CONFIDENCE | upgraded |
 | Fuel feed-forward divides by λ setpoint; controller factor `0x5B98A0` | CONFIRMED structure | round 4: a target ≠ 1.000 switches the bank to open loop (see below) |
 | TGENOFVL → `0x1C9412` (full-load-edge generator timer, stock 0) | HIGH CONFIDENCE (round 4) | full chain to the voltage request traced |
@@ -120,6 +120,21 @@ Verification: 62 checks (31 + 16 + 15), all pass on the reference dump.
 
 Verification: 72 checks (62 + 10), all pass.
 
+## Round 6 status (0x1A2 speed / ratio path only)
+
+| Item | Status | Notes |
+|---|---|---|
+| 0x1A2 decode: raw → `0x5B9982`, 0xFFFF → 0, timeout (> 50 calls without RX indication `0x3FA58C`) → 0 | CONFIRMED | `research/egs-tcc-shift-state.md` §1 |
+| `0x5B981E = min((0x5B9982 << 13) / 0x5B9A26, 0xFFFF)`, rpm 0 → 0xFFFF/0 | CONFIRMED | numerator selector CAL `0x1C8532` bit 0x02 (= 0x0E) |
+| Ratio scale 0x4000 = 1.0, 0x1A2 = 0.125 rpm/bit | LIKELY | from the map axis 0.90…1.06 × 0x4000 |
+| Map CAL `0x1C84B0` 6×8 (ratio × gear), helper INT `0x17B64`, output 0x8000 = ×1 | CONFIRMED geometry/values/scaling | role HYPOTHESIS name |
+| `0x5B97F0` divides the gain `0x5B982A` of a second-order low-pass on the torque request (`0x5B9808` → `0x5B97F8`) | CONFIRMED | second divisor path (bit 0x10) and INT `0x5F52C` reader inactive in this calibration |
+| Filtered request used while positive-step latch `0x3FC18D` is set ("tip-in shaping") | CONFIRMED mechanism / LIKELY name | |
+| 0x1A2 = transmission input / converter turbine speed | LIKELY | output speed REJECTED (single ±6 % ratio axis for all gears) |
+| TCC lock / slip state in the DME | CONFIRMED absent | no threshold, flag or derivative on the ratio; lock meaning of 1.00–1.04 zone HYPOTHESIS |
+
+Verification: 84 checks (72 + 12), all pass.
+
 ## Round-2 input limitation
 
 The third-party 560B bin/XDF and 725D A2L were not re-opened in round 2. 560B-based names rely on
@@ -134,4 +149,4 @@ the offsets/descriptions recorded in round 1 (`research/reference-symbols.csv`).
 `research/verified-findings.md`, `research/symbol-map-770B.csv`, `research/560B-to-770B-mapping.md`,
 `research/aevab-redabm.md`, `research/lambda-control.md`, `research/torque-and-modes.md`,
 `research/generator-control.md`, `research/exhaust-flap.md`, `research/thermal-management.md`,
-`research/ignition-vanos-valvetronic.md`, `research/egs-integration-plan.md`, `research/can-and-drive-modes.md`, `research/sport-mode.md`, `research/kickdown-path.md`, `research/dme-egs-interface.md`, `research/aevab-integration-points.md`, `research/cylinder-cut-lambda.md`, `research/valvetronic.md`, `research/vanos.md`, `research/ignition-knock-fuel-quality.md`, `research/full-load-enrichment.md`, `research/overrun-dfco.md`, `research/firing-density-feasibility.md`.
+`research/ignition-vanos-valvetronic.md`, `research/egs-integration-plan.md`, `research/can-and-drive-modes.md`, `research/sport-mode.md`, `research/kickdown-path.md`, `research/dme-egs-interface.md`, `research/aevab-integration-points.md`, `research/cylinder-cut-lambda.md`, `research/valvetronic.md`, `research/vanos.md`, `research/ignition-knock-fuel-quality.md`, `research/full-load-enrichment.md`, `research/overrun-dfco.md`, `research/firing-density-feasibility.md`, `research/egs-tcc-shift-state.md`.

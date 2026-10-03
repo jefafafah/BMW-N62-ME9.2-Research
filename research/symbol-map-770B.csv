@@ -65,7 +65,16 @@ fn DME TX builder,builds 0x0A8/0x0A9/0x0AA,code,0x4B128,internal flash,int 0x4B1
 (EGS present),automatic/EGS-on-CAN flag,RAM,0x3FBED1,internal SRAM,,u8,,,HYPOTHESIS,LIKELY,selects CAN gear vs computed gear
 (EGS limit request),0x0B5 byte5 bits6-7 nonzero,RAM,0x3FBEDD,internal SRAM,,u8,,,HYPOTHESIS,LIKELY,"driver wish := min(KFPED, 0x3FB460+0x3FB45E) at INT 0x463B0"
 (transmission temperature),0x0B5 byte7 converted (raw+8)*4/3,RAM,0x5B9229,external RAM,,u8 0.75 degC/-48,,,HYPOTHESIS,HIGH CONFIDENCE,INT 0x397C4-0x397D4; fallback 0x5B9307
-(turbine speed candidate),0x1A2 bytes0-1,RAM,0x5B9982,external RAM,,u16 (0xFFFF invalid),,,HYPOTHESIS,LIKELY,divided by engine speed at INT 0x46E3C
+(transmission input / turbine speed),0x1A2 bytes0-1 raw,RAM,0x5B9982,external RAM,,u16 (0xFFFF->0; timeout->0; 0.125 rpm/bit LIKELY),,,LIKELY,CONFIRMED,decoder INT 0x392C8 signal 0x13; only active reader INT 0x46E3C (ratio); output-speed reading REJECTED (common ratio axis for all gears)
+(turbine/engine speed ratio),min((0x5B9982<<13)/0x5B9A26; 0xFFFF),RAM,0x5B981E,external RAM,,u16 (0x4000 = 1.0 LIKELY),,,LIKELY,CONFIRMED,written INT 0x46E78..0x46EB0; sole reader INT 0x46ED8 (x input of map 0x1C84B0); no threshold/flag derived
+(ratio filter-gain factor),map 0x1C84B0 output,RAM,0x5B97F0,external RAM,,u16 (0x8000 = x1.0),,,HYPOTHESIS,CONFIRMED,divisor of 0x5B982A at INT 0x46F4C (active); 0x475D8 / EXT 0xF88874 inactive (CAL 0x1C8532 bit 0x10 clear)
+(ratio x gear filter-gain map),"factor vs turbine/engine ratio and gear",calibration,0x1C84B0,CAL alias (r2+0x4C0),ext 0xC84B0,6x8 u16 map (x ratio 0.90..1.06 x0x4000; y gear 0..7),,,HYPOTHESIS,CONFIRMED,looked up at INT 0x46EDC via helper 0x17B64; 1.0 in gears 0/1/R; gears 2-6: 0.2 at 0.90 .. 1.2-1.5 at 1.00-1.04
+(ratio path codeword),selects numerator (0x02) / map (0x04) / gain divide (0x08) / 2nd divide (0x10),calibration,0x1C8532,CAL alias (r2+0x542),ext 0xC8532,u8 bitfield (stock 0x0E),,,HYPOTHESIS,CONFIRMED,tested at INT 0x46E2C/0x46EB8/0x46F30/0x475C4 and EXT 0xF8885C
+(torque-rise filter gain),"(0x5B9828<<15)/0x5B97F0, clamp 1..0xFFFF",RAM,0x5B982A,external RAM,,u16,,,HYPOTHESIS,CONFIRMED,step gain of integrators 0x3FB444/0x3FB448 (INT 0x16070) filtering 0x5B9808 -> 0x5B97F8
+(torque request filtered),second-order low-pass output,RAM,0x5B97F8,external RAM,,u16,,,HYPOTHESIS,CONFIRMED,used for 0x5B9806 while latch 0x3FC18D (positive step > 0x5B97EA) is set (INT 0x47700)
+(torque-rise shaping latch),set on request step > 0x5B97EA,RAM,0x3FC18D,internal SRAM,,flag,,,HYPOTHESIS,CONFIRMED,written INT 0x46B58..0x46B90; selects 0x5B97F8 into 0x5B9806
+(0x1A2 received),RX indication flag,RAM,0x3FBED6,internal SRAM,,flag,,,HYPOTHESIS,CONFIRMED,set by INT 0x1D974; cleared on 0x1A2 timeout / EGS absent in INT 0x392C8
+(0x1A2 timeout counter),decoder calls since last frame,RAM,0x3FA589,internal SRAM,,u8 (limit >50),,,HYPOTHESIS,CONFIRMED,INT 0x39590..0x395BC
 (0x0BA status bits),0x0BA byte0 bit6/bit7,RAM,0x3FBEE0/0x3FBEDF,internal SRAM,,u8 flags,,,HYPOTHESIS,CONFIRMED (position),consumers misfire/rough-running monitors
 (pedal/kickdown CAN state),state code packed into 0x0AA byte6 bits4-7,RAM,0x5B902B,external RAM,,u8 (0x0B=kickdown),,,HYPOTHESIS,CONFIRMED,EXT 0xFA8E70 -> INT 0x4B128
 (pedal CAN byte),0x0AA byte3,RAM,0x5B92C9,external RAM,,u8 (pedal>>8),,,HYPOTHESIS,CONFIRMED,EXT 0xFA8E70

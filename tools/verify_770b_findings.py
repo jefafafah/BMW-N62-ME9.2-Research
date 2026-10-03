@@ -221,6 +221,46 @@ def main() -> int:
     check(dform(img, 0xF1206C)[3] == 0x4800 and touched(0x306086, 0xF1207C, "W"),
           "EXT 0xF12018 only switches MIOS register 0x306086 (0x4800/0x4000): not a duty writer (round-5 rejection)")
 
+    # --- round 6: 0x1A2 speed / ratio path -----------------------------------
+    check(any(p == 0x39530 and t2 == 0x63660 and r.get(3) == 0x13 for p, t2, r in calls)
+          and img.u32(0x39564) == 0x280CFFFF and touched(0x5B9982, 0x39574, "W") and touched(0x5B9982, 0x39580, "W"),
+          "0x1A2 (signal 0x13) -> 0x5B9982 unscaled; raw 0xFFFF stored as 0 (INT 0x39564/0x39574)")
+    check(dform(img, 0x39594)[3] == 0x32 and touched(0x5B9982, 0x395B0, "W") and touched(0x3FA58C, 0x1D98C, "W"),
+          "0x1A2 timeout: >50 decoder calls without RX indication (INT 0x1D974 sets 0x3FA58C) -> 0x5B9982 = 0")
+    check(img.u8(0x1C8532) == 0x0E and img.u32(0x46E2C) == 0x558C07BC and touched(0x5B9982, 0x46E3C)
+          and img.u32(0x46E40) == 0x559868E4 and touched(0x5B97BA, 0x46E4C),
+          "CAL 0x1C8532 = 0x0E: bit 0x02 set selects 0x5B9982 (not model 0x5B97BA) as numerator, shifted <<13")
+    check(img.u32(0x4635C) == 0x3B399A26 and img.u32(0x46E54) == 0xA3B90000 and img.u32(0x46E60) == 0x7F18EB96
+          and img.u32(0x46E64) == 0x2818FFFF and all(touched(0x5B981E, pc, "W") for pc in (0x46E78, 0x46E84, 0x46EA0, 0x46EB0)),
+          "0x5B981E = min((0x5B9982<<13) / 0x5B9A26, 0xFFFF); rpm 0 -> 0xFFFF (or 0 if numerator 0)")
+    rx = [img.u16(0x1C84B4 + 2 * i) for i in range(6)]
+    gy = [img.u16(0x1C84C0 + 2 * i) for i in range(8)]
+    mv = [img.u16(0x1C84D0 + 2 * i) for i in range(48)]
+    check(img.u16(0x1C84B0) == 6 and img.u16(0x1C84B2) == 8 and gy == list(range(8))
+          and [round(v / 0x4000, 2) for v in rx] == [0.90, 0.96, 0.99, 1.00, 1.04, 1.06],
+          "map 0x1C84B0: 6 ratio breakpoints 0.90/0.96/0.99/1.00/1.04/1.06 x 0x4000, gear axis 0..7")
+    check(img.u32(0x17CF4) == 0x7CE43B78 and img.u32(0x192D8) == 0x7D8441D6
+          and all(mv[x * 8 + g] == 0x8000 for x in range(6) for g in (0, 1, 7)) and mv[2 * 8:3 * 8] == [0x8000] * 8
+          and mv[5 * 8:6 * 8] == [0x8000] * 8 and min(mv) == 0x199A and max(mv) == 0xC000,
+          "map data ratio-major [x*8+gear]; gears 0/1/7 and ratio 0.99/1.06 = 0x8000; range 0x199A..0xC000")
+    check(call_with(0x46EDC, 0x17B64, 0x1C84B0) and touched(0x5B981E, 0x46ED8) and touched(0x5B92CA, 0x46EC8)
+          and touched(0x5B97F0, 0x46EE4, "W") and img.u32(0x46EB8) == 0x558C077A and touched(0x5B97F0, 0x46F28, "W"),
+          "0x5B97F0 := map 0x1C84B0(0x5B981E, gear 0x5B92CA) when CAL bit 0x04, else curve 0x1CF804")
+    check(img.u32(0x46F30) == 0x558C0738 and touched(0x5B9828, 0x46F40) and img.u32(0x46F44) == 0x55997860
+          and touched(0x5B97F0, 0x46F4C) and img.u32(0x46F58) == 0x7F39C396 and touched(0x5B982A, 0x46F94, "W"),
+          "filter gain 0x5B982A = clamp((0x5B9828<<15) / 0x5B97F0, 1, 0xFFFF) when CAL bit 0x08 (0x8000 = x1)")
+    check(touched(0x5B982A, 0x47058) and any(p in (0x47064, 0x470C0) and t2 == 0x16070 for p, t2, r in calls)
+          and touched(0x3FB444, 0x47068, "W") and img.u32(0x470C4) == 0x90780000 and touched(0x3FB448, 0x46FB0),
+          "0x5B982A is the step gain of the two cascaded integrators 0x3FB444/0x3FB448 (helper INT 0x16070)")
+    check(img.u32(0x46AA4) == 0x91410008 and touched(0x5B97F8, 0x46AA0) and touched(0x5B9808, 0x46800)
+          and img.u32(0x47700) == 0x81810008 and img.u32(0x47708) == 0xB19C0000 and touched(0x5B9806, 0x46974),
+          "filter input 0x5B9808, output 0x5B97F8 (via 8(r1)); output copied to 0x5B9806 while latch 0x3FC18D set")
+    check(img.u32(0x475C4) == 0x556B06F6 and img.u32(0xF88860) == 0x556B06F6 and not img.u8(0x1C8532) & 0x10
+          and touched(0x5B97F0, 0x475D8) and touched(0x5B97F0, 0xF88874),
+          "second 0x5B97F0 divisor (0x5B9824 -> 0x5B9826, INT 0x475D8 / EXT 0xF88874) gated by CAL bit 0x10: inactive")
+    check(img.u32(0x5F684) == 0x554A07FE and img.u8(0x1C7AB4) & 1 == 0 and touched(0x5B9982, 0x5F6D0),
+          "INT 0x5F52C reads 0x5B9982 only when CAL 0x1C7AB4 bit0 set (=0x00): inactive in this calibration")
+
     for ok, text in results:
         print(f"[{'PASS' if ok else 'FAIL'}] {text}")
     failed = sum(1 for ok, _ in results if not ok)

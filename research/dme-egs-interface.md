@@ -12,8 +12,8 @@ CAN IDs and byte positions below are taken from the DME message/signal tables an
 | Drive engaged | EGS→DME | `0x3FBEDE`/`0x3FBEDA` | derived from gear ≠ 0 | 0x0BA | flag | LIKELY |
 | Selector / program (P,R,N,D,S,M) | — | none | not received (0x192/0x1D2 absent) | — | — | CONFIRMED absent |
 | Status bits (shift-active / lock candidates) | EGS→DME | `0x3FBEE0` (bit6), `0x3FBEDF` (bit7) | misfire/rough-running monitors INT `0x23338`, `0x23734`; INT `0x5C99C`, `0x4533C`; EXT `0xF2EA9C` | 0x0BA byte0 bits6-7 | flags, both 1 on timeout | positions CONFIRMED, meaning HYPOTHESIS |
-| Turbine/output speed candidate | EGS→DME | `0x5B9982` | INT `0x46E3C` (÷ engine speed `0x5B9A26`, enabled by CAL `0x1C8532` bit1), INT `0x5F52C` | 0x1A2 bytes0-1 | u16, 0xFFFF invalid; unit open | LIKELY |
-| TCC slip | derived | ratio written to `0x5B981E` | INT `0x46E54…0x46E84` | from 0x1A2 | (speed<<13)/rpm | HYPOTHESIS |
+| Transmission input (turbine) speed | EGS→DME | `0x5B9982` | INT `0x46E3C` (÷ engine speed `0x5B9A26`, selected by CAL `0x1C8532` bit 0x02); INT `0x5F52C` (inactive) | 0x1A2 bytes0-1 | u16, raw, 0xFFFF → 0, timeout → 0; 0.125 rpm/bit LIKELY | LIKELY (round 6; output speed REJECTED) |
+| Turbine/engine speed ratio | derived | `0x5B981E` | INT `0x46E28…0x46EB0` → map CAL `0x1C84B0` | from 0x1A2 | min((n<<13)/rpm, 0xFFFF); 0x4000 = 1.0 LIKELY | CONFIRMED formula; no TCC state derived (round 6) |
 | EGS torque/driver-wish limit | EGS→DME | `0x3FBEDD` | INT `0x463B0`: wish := min(KFPED, `0x3FB460`+`0x3FB45E`) | 0x0B5 byte5 bits6-7 ≠ 0 | flag | LIKELY |
 | EGS torque-reduction value | EGS→DME | not found | 0x0B5 bytes0-3 are **not read** by the DME | — | — | open; possibly not via 0x0B5 in this pairing |
 | 2-bit EGS status → coolant logic | EGS→DME | `0x3FBEDB`/`0x3FBEDC` | EXT `0xF9E148` (sets `0x5BBAC7.2` if exactly one bit set), EXT `0xF48754`, `0xFAEDB8` | 0x0B5 byte4 bits6-7 | 2-bit | HYPOTHESIS |
@@ -33,7 +33,7 @@ Log DME RAM through the diagnostic logger and raw PT-CAN (all IDs, timestamps) a
 | Group | RAM variables | CAN |
 |---|---|---|
 | Gear/program | `0x5B92CA`, `0x5B8F71`, `0x3FBEDE`, `0x3FBEE0`, `0x3FBEDF`, `0x5B8F72`, `0x5B8F73`, `0x3FBEDB`, `0x3FBEDC`, `0x3FBED9` | 0x0BA, 0x0B5, 0x1D2, 0x192 |
-| Converter | `0x5B9982`, `0x5B981E`, `0x5B9A26` | 0x1A2, 0x0AA |
+| Converter | `0x5B9982`, `0x5B981E`, `0x5B9A26`, `0x5B97F0`, `0x5B982A`, `0x5B9808`, `0x5B97F8`, `0x5B9806`, `0x3FC18D`, `0x3FBED6` | 0x1A2, 0x0AA |
 | Torque/interventions | `0x3FBEDD`, `0x3FB460`, `0x3FB45E`, `0x5B981A`, `0x5B981C`, `0x5B97DA`, `0x3FC32A`, `0x3FBF34`, `0x3FBF38`, `0x3FC195`, `0x3FC1A3`, `0x5B93E7`, `0x5B92EA` | 0x0A8, 0x0A9, 0x0B5, 0x0B6/0x0CE/0x19E/0x1A0 |
 | Kickdown | `0x3FBFB3`, `0x5B902B`, `0x5B92C9`, `0x5B96D8` | 0x0AA |
 | Temperatures | `0x5B9229`, `0x5B9307`, `0x5B90BB` | 0x0B5 |
@@ -73,3 +73,20 @@ from the packing code in INT `0x4B128`; names are as stated.
 
 Status of the EGS fields from round 3 (0x0BA bits 6/7, 0x1A2 speed, ratio `0x5B981E`): no new
 consumer evidence in round 4. Meanings remain HYPOTHESIS / LIKELY as listed above.
+
+---
+
+# Round 6 additions (2026-10-03): 0x1A2 speed / ratio path
+
+Full trace in `egs-tcc-shift-state.md`. Summary:
+
+| Item | Finding | Status |
+|---|---|---|
+| 0x1A2 decode | signal 0x13 → `0x5B9982` unscaled; 0xFFFF → 0; EGS-present `0x3FBED1` = 0 → 0; RX indication INT `0x1D974` sets `0x3FA58C`; after > 50 decoder calls without a frame → 0 (last value held until then) | CONFIRMED |
+| Ratio | `0x5B981E = min((0x5B9982 << 13) / 0x5B9A26, 0xFFFF)`; rpm 0 → 0xFFFF (0 if numerator 0); numerator selector CAL `0x1C8532` bit 0x02 (set; alternative = DME model `0x5B97BA`, INT `0x5F398`) | CONFIRMED |
+| Ratio scale | map axis 0.90/0.96/0.99/1.00/1.04/1.06 × 0x4000 → 0x4000 = n(0x1A2) = n(engine), 0x1A2 = 0.125 rpm/bit | LIKELY |
+| Map CAL `0x1C84B0` | 6 (ratio) × 8 (gear `0x5B92CA`) u16, helper INT `0x17B64`, ratio-major data; factor 0x8000 = 1.0; 1.0 in gears 0/1/R, in gears 2–6: 0.2 at 0.90, 0.5–0.7 at 0.96, 1.0 at 0.99, 1.2–1.5 at 1.00–1.04, 1.0 at 1.06 | CONFIRMED (values/geometry) |
+| Output `0x5B97F0` | divisor: `0x5B982A = clamp((0x5B9828 << 15) / 0x5B97F0, 1, 0xFFFF)` (CAL bit 0x08, active); second divisor for `0x5B9826` (bit 0x10) inactive | CONFIRMED |
+| Behaviour | `0x5B982A` = gain of a unity-gain second-order low-pass on torque request `0x5B9808` → `0x5B97F8`, which replaces the request (`0x5B9806`) while the positive-step latch `0x3FC18D` is set | CONFIRMED structure; "tip-in shaping" LIKELY |
+| 0x1A2 meaning | transmission input = converter turbine speed; output speed rejected (one ±6 % ratio axis for all gears) | LIKELY |
+| TCC lock / slip state | none derived: no threshold, flag or derivative on `0x5B981E` | CONFIRMED absent; lock meaning of the map zone HYPOTHESIS |
