@@ -73,7 +73,30 @@ fn DME TX builder,builds 0x0A8/0x0A9/0x0AA,code,0x4B128,internal flash,int 0x4B1
 (measured lambda A/B),measured lambda per bank (4096=1.0),RAM,0x5B9708/0x5B970A,external RAM,,u16,,,HYPOTHESIS,LIKELY,written INT fn 0x55A1C
 (lambda controller factor),closed-loop fuel factor,RAM,0x5B98A0/0x5B98A2,external RAM,,u16,,,HYPOTHESIS,LIKELY,written INT fn 0x56DD0; multiplied into fuel at INT 0x2ECBC
 fn fuel mass,load / lambda setpoint x controller factor,code,0x2E9E4,internal flash,int 0x2E9E4,function,,,HYPOTHESIS,CONFIRMED,division by 0x5B96A4 at 0x2ECB0
-TGENOFVL (candidate),generator-off time at full load,calibration,0x1C9412,CAL alias (r2+0x1422),ext 0xC9412,u8 (stock 0 = disabled),0x92FA,+0x118,LIKELY,CONFIRMED (timer function),EXT fn 0xF47E48: loaded on full-load edge; running flag 0x5B90EB -> 0xF8A648
+TGENOFVL,generator-off time at full load,calibration,0x1C9412,CAL alias (r2+0x1422),ext 0xC9412,u8 (stock 0 = disabled),0x92FA,+0x118,HIGH CONFIDENCE,CONFIRMED (timer function),full chain: full-load edge -> timer (EXT 0xF47E48) -> 0x5B90EB -> 0x5B8F2D (EXT 0xF8A648) -> voltage request EXT 0xF8A9D0; stock 0 = disabled; local delta +0x118
 (full-load flag),load above rpm curve,RAM,0x5B8F26,external RAM,,u8,,,HYPOTHESIS,LIKELY,written EXT 0xFA521C (fn 0xFA4F60)
 (generator torque maps x3),per-variant generator maps,calibration,0x1C8FAC/0x1C8FF8/0x1C9044,CAL alias,ext 0xC8FAC/0xC8FF8/0xC9044,map 7x8 each,,,HYPOTHESIS,HYPOTHESIS,EXT fn 0xF8A1C8
 (flap output channel),digital output channel 12 driven by 0x3FC286,code,0x38C1C,internal flash,int 0x38C1C,call site,,,HYPOTHESIS,CONFIRMED,"bl 0xAC00(0xC,1,0x3FC286)"
+IMLEVABS,integrated air mass before lambda release after cylinder cut (bank A),calibration,0x1C99C2,CAL alias (r2+0x19D2),ext 0xC99C2,u16 (stock 1),0x98AA,+0x118,HIGH CONFIDENCE,CONFIRMED,INT 0x58CB4: (air-mass integral 0x3F9D28>>8) < value -> 0x3FC1F5 blocks release; integral reset by bank-cut flag 0x3FBFFE
+(IMLEVABS bank B),same for bank B,calibration,0x1C99C4,CAL alias,ext 0xC99C4,u16 (stock 1),,,HYPOTHESIS,CONFIRMED,INT 0x58D40 with 0x3FBFFF / 0x3F9D2C -> 0x3FC1F6
+(post-overrun lambda delay),air-mass threshold after overrun cut,calibration,0x1C99C6,CAL alias,ext 0xC99C6,u16 (stock 0x62),,,HYPOTHESIS,CONFIRMED,INT 0x58C24; 0x3FC19F resets integral 0x3F9D30 -> 0x3FC1F7
+(air-mass flow),air-mass flow (integrated by IMLEVABS logic),RAM,0x3FC2FC,internal SRAM,,u16,,,HYPOTHESIS,CONFIRMED,written EXT 0xFACDB4 (fn 0xFACD74); byte form 0x3FC2B6 at 0xFACDDC
+(lambda release A/B),closed-loop release per bank,RAM,0x3FC1EE/0x3FC1EF,internal SRAM,,u8,,,HYPOTHESIS,CONFIRMED,INT 0x58AE8
+(lambda active A),controller active bank A (needs setpoint ~1.000),RAM,0x3FC1E3,internal SRAM,,u8,,,HYPOTHESIS,CONFIRMED,INT 0x57118
+(lambda integrator A),controller integrator / state,RAM,0x5B989E,external RAM,,s16,,,HYPOTHESIS,CONFIRMED,reset to 0 when not released (INT 0x574DC); factor 0x5B98AE = 0x8000 + value
+(lambda factor limit),upper limit of controller factor,calibration,0x1C95A2,CAL alias,ext 0xC95A2,u16 (0xA000 = 1.25),,,HYPOTHESIS,CONFIRMED,INT 0x57D0C
+(closed-loop off-1.0 enable),codeword bit2 allows regulation at setpoint != 1.0,calibration,0x1C947C,CAL alias,ext 0xC947C,u8 bitfield (stock 0x1B),,,HYPOTHESIS,CONFIRMED,INT 0x570F4
+(mixture adaptation block),learned mixture adaptation values,RAM,0x5B8920..0x5B8952,external RAM,,u16 array,,,HYPOTHESIS,LIKELY,learned EXT 0xF54F18; applied INT 0x5EB7C -> 0x5B96BA
+KFLAMFA (candidate),full-load / driver-wish lambda map,calibration,0x1CE1BC,CAL alias,ext 0xCE1BC,map 4x4 u8 (record),0xE0AE,~+0x116,LIKELY,LIKELY,"EXT fn 0xF7E200 -> lambda request 0x5B891A; inputs full-load flag, rpm, temperature"
+(component-protection lambda),exhaust-temperature-model enrichment request,RAM,0x5B9C2E,external RAM,,u16,,,HYPOTHESIS,HYPOTHESIS,"EXT fn 0xF7C014 (maps 0x1C5642, 0x1C5552, 0x1CD9CC)"
+(Valvetronic lift request B1/B2),per-bank lift request sent on CAN 0x105/0x10D,RAM,0x5B9D10/0x5B9D12,external RAM,,u16 (0..0xFFFE of 0x6EA),,,HYPOTHESIS,CONFIRMED,INT fn 0x4FB78
+(Valvetronic lift target),common lift target,RAM,0x5B9BB6,external RAM,,u16,,,HYPOTHESIS,LIKELY,INT fn 0x4E21C
+(Valvetronic main lift map),lift vs rpm x load demand,calibration,0x1C47E8,CAL alias,ext 0xC47E8,map 16x16 u16,,,HYPOTHESIS,LIKELY,INT 0x4E588
+(Valvetronic bank trims),per-bank lift trim,RAM,0x5B8AEA/0x5B8AEC,external RAM,,u16,,,HYPOTHESIS,LIKELY,added to the lift request at INT 0x4FD08/0x4FE94
+fn digital output stage,drives digital output channels 2..41,code,0x38A54,internal flash,int 0x38A54,function,,,HYPOTHESIS,CONFIRMED,"driver INT 0xAC00(channel,invert,value)"
+(thermostat heater command),output channel 6,RAM,0x3FC29B,internal SRAM,,u8,,,HYPOTHESIS,LIKELY,written by coolant-target fn EXT 0xF9E148
+(purge valve command),output channel 4,RAM,0x3FC2B5,internal SRAM,,u8,,,HYPOTHESIS,LIKELY,EXT 0xF9ED98 also produces lambda multiplier 0x5B8E3A
+fn CAN torque words,converts internal torques for 0x0A8/0x0A9/0x0AA,code,0x4BDDC,internal flash,int 0x4BDDC,function,,,HYPOTHESIS,CONFIRMED,converter INT 0x4BCCC / 0x4BD40
+(max torque candidate),maximum available torque (0x0A9 bits 28-39),RAM,0x5B9854,external RAM,,u16,,,HYPOTHESIS,LIKELY,written EXT 0xFA4F30 (full-load fn 0xFA4D04)
+(driver request torque),0x0AA bits 12-23,RAM,0x5B980A,external RAM,,u16,,,HYPOTHESIS,LIKELY,INT 0x467F0; 0 in overrun cut
+(generator reduction flag),full-load/timer generator relief flag,RAM,0x5B8F2D,external RAM,,u8,,,HYPOTHESIS,CONFIRMED,EXT 0xF8A950 -> read EXT 0xF8A9F4

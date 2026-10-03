@@ -100,3 +100,13 @@ damienmaguire/BMW-E65-CANBUS (see `references/SOURCES.md`). Used only to cross-c
 roles of IDs. Every confirmed ID above comes from the DME message table, not from the reference.
 Claims from that repository **not** confirmed here: the 500 kbit/s bitrate (not yet derived), the
 0x192 S-M-D decoding (not received by the DME), and 0x1D2 semantics (not received by the DME).
+
+---
+
+# Round 4 additions (2026-10-03)
+
+* TouCAN-B (private bus) is the **Valvetronic link** on the DME side: per-bank lift requests in 0x105
+  (bank 1) and 0x10D (bank 2), rpm/status in 0x1FF, feedback in 0x184/0x185/0x18C/0x18D. CONFIRMED
+  (DME side); details in `valvetronic.md`.
+* Torque fields of 0x0A8/0x0A9/0x0AA decoded at bit level: `dme-egs-interface.md` (round-4 section).
+* No new evidence on D/S/M; the round-3 verdict (no D/S/M state in the DME) stands.

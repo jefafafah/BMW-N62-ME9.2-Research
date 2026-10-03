@@ -105,3 +105,19 @@ In-car / bench (read-only first):
 3. Converter: correlate 0x1A2 (`0x5B9982`) with engine speed during lock/unlock.
 4. Flap polarity on output channel 12.
 5. AEVAB during DSC/EGS interventions (`0x5B93E7`, `0x5B92EA`, `0x3FBF34/38`), plus exhaust λ/catalyst temperature during any cut event.
+
+## Round 5 — next static-analysis tasks
+
+1. Locate PWM outputs (VANOS solenoids, electric fan, possibly thermostat): TPU3/MIOS channel parameter writes with duty values → back-trace setpoints. Then fill `research/vanos.md`.
+2. Locate knock detection/adaptation (QADC window acquisition → per-cylinder retard and long-term adaptation) to answer the 95/98 RON question.
+3. Decode the priority logic inside lambda arbitration INT `0x1A4F0` and the full-load/protection enrichment maps (`0x1CE1BC`, `0x1C5642`, `0x1C5552`).
+4. Resolve the pointer-based writer of the overrun request `0x3FC162` and the entry/exit/resume thresholds in EXT `0xFAE33C`/`0xFAE940`.
+5. Name the torque words feeding 0x0A8/0x0A9 (`0x5B983A`, `0x5B9878`, `0x5B987A`) by tracing INT `0x4790C` and `0x48F68` against the torque model.
+
+## Round 5 — read-only in-car logging experiments
+
+1. During DSC/EGS interventions: `0x5B92EA`, `0x3FBFFE/FF`, `0x3FC1EE/EF`, `0x3FC1E3`, `0x5B98AE`, `0x5B989E`, `0x5B891E`, measured λ `0x5B9708/0A` → confirm open loop during the cut and the IMLEVABS release timing.
+2. Lean-target behaviour: log `0x5B96AA` vs `0x3FC1E3` at steady cruise to confirm that closed loop is only active at exactly 1.000.
+3. Valvetronic: capture private-bus 0x105/0x10D/0x185/0x18D with `0x5B9D10/12`, `0x5B9BB6`, `0x5B9D14/16`, to get units and the actual-vs-requested lift relationship.
+4. CAN torque words 0x0A8/0x0A9/0x0AA vs pedal, load and EGS shifts, to name the words (max torque, loss torque, driver request).
+5. Outputs: actuator test of channels 4/6/7/8 (thermostat heater, purge) with a current clamp, and generator voltage at full load (TGENOFVL stock = 0 → expect no relief).

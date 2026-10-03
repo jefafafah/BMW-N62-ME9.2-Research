@@ -33,3 +33,9 @@ rpm×4 2200…24800, y = 200…8200, used at INT `0x40A64`/`0x54EFC`), and the 2
 in the same function `0x409xx`.
 
 Status of all section-4 items: **HYPOTHESIS**.
+
+---
+
+Round 4 update: superseded by `valvetronic.md`, `vanos.md` and `ignition-knock-fuel-quality.md`.
+The §4 VANOS candidates (`0x1C21AC`, `0x1C2500`, `0x1C2636` in fn INT `0x406B0`) are **REJECTED** as
+VANOS: they belong to the air-charge model.

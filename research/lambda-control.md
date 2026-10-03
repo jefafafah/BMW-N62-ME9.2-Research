@@ -138,3 +138,26 @@ behaviour unknown).
 
 Full-load enrichment and protection enrichment sources inside the arbitration (INT `0x1A4F0` inputs
 `0x5B968C`, `0x5B969A…0x5B96A0`), the IMLEVABS integrator, and the adaptation memory.
+
+---
+
+# Round 4 additions (2026-10-03)
+
+The full cylinder-cut / lambda analysis is in `cylinder-cut-lambda.md`. Key facts for this file:
+
+* **Closed-loop condition** (INT `0x570E8`): bank A only regulates when the snapped setpoint `0x5B96AA`
+  is within ±1 of 0x1000, unless CAL `0x1C947C` bit2 is set (stock 0x1B: not set). **CONFIRMED.**
+  Correction to round 3 §9: a lean setpoint does *not* move the controller target along with it.
+  It switches the bank to **open loop**. Lean cruise via the setpoint therefore means open-loop
+  lean operation unless that calibration bit (or the code) is changed.
+* Release flags `0x3FC1EE` (A) / `0x3FC1EF` (B) from INT `0x58AE8`: AND of ~14 conditions, including
+  the post-cut and post-overrun air-mass integrals (IMLEVABS = CAL `0x1C99C2`/`0x1C99C4`, overrun CAL
+  `0x1C99C6`).
+* Controller INT `0x56DD0`: when not released, the state words are **reset** to 0 and the factor is 1.0
+  (or a hold value). Upper factor limit CAL `0x1C95A2` = 0xA000 (1.25). The setpoint passes through a
+  transport-delay buffer (helper INT `0x16154`).
+* Adaptation: learning EXT `0xF54F18` (block `0x5B8920…0x5B8952`), applied by INT `0x5EB7C` as factor
+  `0x5B96BA`, checked by EXT `0xF5199C` (±20/23 % limits). Enables `0x3FC1E7/0x3FC1E8` depend on the
+  release and on setpoint ≥ CAL `0x1C9986` (λ 0.90). LIKELY.
+* Additive fuel term in the fuel calc: `0x5B9654` (writer not resolved).
+* Full-load and protection inputs of the arbitration: see `full-load-enrichment.md`.

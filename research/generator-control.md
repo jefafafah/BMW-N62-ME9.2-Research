@@ -89,3 +89,33 @@ Three parallel calibration sets suggest per-alternator-variant models, selected 
 
 Low-voltage protection: the 11.2 V / 10.6 V constants in `0xF8A9D0` are the likely lower bounds
 (HYPOTHESIS). The physical link to the alternator (BSD) is still not identified.
+
+---
+
+# Round 4 additions (2026-10-03)
+
+## 9. TGENOFVL promoted to HIGH CONFIDENCE
+
+Full chain, CONFIRMED in code (checks in `verify_770b_findings.py`):
+
+```text
+full-load flag 0x5B8F26 (EXT 0xFA4F60)
+  → EXT 0xF47E48: edge → timer 0x3FB4C6 := CAL 0x1C9412 (stock 0)   → running flag 0x5B90EB
+  → EXT 0xF8A648: 0x5B8F2D = (CAL 0x1C940A == 1) && (0x5B90EA || 0x5B90EB)
+  → EXT 0xF8A9D0 (voltage request): 0x5B8F2D && 0x3FBEFC gate the request path at 0xF8A9F4
+```
+
+The behaviour (timed generator relief triggered by full load) matches the 560B description, and the
+local delta (+0x118) matches the neighbouring anchors. **HIGH CONFIDENCE** for TGENOFVL = CAL
+`0x1C9412`. With the stock value 0 the timer never runs.
+
+## 10. Overrun link
+
+`0x3FC169` (EXT `0xFAE978`, overrun-related, HYPOTHESIS) is read by EXT `0xF47E48`, which then counts
+down the release timers `0x3FB4C0/0x3FB4C1`, and by EXT `0xF8A648`. An overrun-dependent generator
+path therefore likely exists already. Its exact effect is open.
+
+## 11. Still open
+
+Battery voltage, generator actual load, the generator torque term in the torque model (the three map
+sets in §7 are candidates) and the BSD driver.

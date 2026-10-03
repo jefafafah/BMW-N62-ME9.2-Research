@@ -19,6 +19,10 @@ Round 3:
 - `me9_can.py` — dumps the CAN message-object table (ID, direction, controller, DLC) and the signal table; `--users` lists the functions reading/writing each signal.
 - `me9_callgraph.py` — `callees`/`callers` trees and `consumers <RAM address>` (functions touching an address, with their callers).
 
+Round 4:
+
+- `me9_trace.py` — `outputs` (digital output-stage channels with command bytes; marks the INT `0xAB88` channels as inputs) and `lookups <fn>` (each curve/map lookup in a function with the RAM loads/stores around it).
+
 Images are passed as `--int/--ext` or via `ME9_INT`/`ME9_EXT`, e.g.
 
 ```sh

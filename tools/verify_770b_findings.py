@@ -158,6 +158,40 @@ def main() -> int:
     check(touched(0x3FC286, 0x38C10) and dform(img, 0x38C14) == (14, 3, 0, 0xC) and any(p == 0x38C1C and t2 == 0xAC00 for p, t2, r in calls),
           "exhaust-flap command 0x3FC286 drives output channel 12 (INT 0x38C1C, bl 0xAC00)")
 
+    # --- round 4: cylinder-cut lambda, Valvetronic, outputs, torque CAN ------
+    check(touched(0x3FBFFE, 0x58C50) and touched(0x3F9D28, 0x58C6C, "W") and touched(0x3FC2FC, 0x58C84),
+          "bank-A cut flag 0x3FBFFE resets air-mass integrator 0x3F9D28 (which integrates air-mass flow 0x3FC2FC)")
+    check(is_r2_ref(img, 0x58CB4, 0x1C99C2) and touched(0x3FC1F5, 0x58CC8, "W"),
+          "IMLEVABS candidate 0x1C99C2: bank-A post-cut threshold -> flag 0x3FC1F5 (blocks lambda release)")
+    check(touched(0x3FBFFF, 0x58CDC) and is_r2_ref(img, 0x58D40, 0x1C99C4) and touched(0x3FC1F6, 0x58D54, "W"),
+          "bank-B equivalent: 0x3FBFFF / threshold 0x1C99C4 -> flag 0x3FC1F6")
+    check(touched(0x3FC19F, 0x58BC0) and is_r2_ref(img, 0x58C24, 0x1C99C6) and touched(0x3FC1F7, 0x58C3C, "W"),
+          "after overrun cut (0x3FC19F) a separate air-mass threshold 0x1C99C6 gates lambda release (flag 0x3FC1F7)")
+    check(touched(0x3FC2FC, 0xFACDB4, "W") and touched(0x3FC2B6, 0xFACDDC, "W"),
+          "0x3FC2FC (air-mass flow) and its byte form 0x3FC2B6 (x input of cut-lambda curve 0x1C6408) written by EXT fn 0xFACD74")
+    check(touched(0x5B96AA, 0x5709C) and dform(img, 0x570E8) == (14, 12, 19, -0xFFF) and dform(img, 0x570EC)[3] == 3,
+          "bank-A closed loop 0x3FC1E3 requires snapped setpoint 0x5B96AA within 0x0FFF..0x1001 (lambda 1.000)")
+    check(touched(0x5B989E, 0x574DC, "W") and touched(0x3FC1EE, 0x570A8),
+          "controller states (e.g. 0x5B989E) are reset to 0 when lambda release 0x3FC1EE is off")
+    check(img.u32(0x57D00) == 0x618C8000 and touched(0x5B989E, 0x57C9C),
+          "bank-A factor 0x5B98AE = 0x8000 + integrator when released, 0x8000 (=1.0) otherwise")
+    check(touched(0x5B9B20, 0x4FD14) and dform(img, 0x4FD24) == (10, 0, 31, 0x6EA) and touched(0x5B9D10, 0x4FD58, "W")
+          and any(p == 0x4FE24 and t2 == 0x63C3C and r.get(3) == 0x36 for p, t2, r in calls),
+          "Valvetronic bank-1 lift request (min(0x5B9B20, 0x5B9BB6+trim), clamp 0x6EA) -> 0x5B9D10 -> CAN 0x105 (signal 0x36)")
+    check(touched(0x5B9D12, 0x4FEE4, "W") and any(p == 0x4FF98 and t2 == 0x63C3C and r.get(3) == 0x38 for p, t2, r in calls),
+          "Valvetronic bank-2 lift request 0x5B9D12 -> CAN 0x10D (signal 0x38): one request per bank, none per cylinder")
+    check(touched(0x3FC29B, 0x38B20) and dform(img, 0x38B24) == (14, 3, 0, 6) and touched(0x3FC29B, 0xF9E624, "W"),
+          "output channel 6 driven by 0x3FC29B, written by the coolant-target fn EXT 0xF9E148")
+    check(touched(0x5B94BC, 0x4BCD0) and touched(0x5B922A, 0x4BD10) and dform(img, 0x4BD1C)[3] == -0x800,
+          "CAN torque converter INT 0x4BCCC: ((T>>1)-(0x5B94BC>>1))*0x5B922A>>10, clamped to signed 12 bit")
+    check(touched(0x5B983A, 0x4BE4C) and any(p == 0x4BE90 and t2 == 0x4BD40 for p, t2, r in calls) and img.u32(0x4B550) == 0x554A6226,
+          "0x0A8 bits 12-23 carry converted torque 0x5B983A (word 0x5B94CA)")
+    check(touched(0x5B9854, 0x4BE6C) and touched(0x5B9854, 0xFA4F30, "W"),
+          "0x0A9 torque word 0x5B94CC is converted from 0x5B9854 (written by full-load fn EXT 0xFA4D04)")
+
+    check(touched(0x5B90EB, 0xF8A92C) and is_r2_ref(img, 0xF8A910, 0x1C940A) and touched(0x5B8F2D, 0xF8A950, "W") and touched(0x5B8F2D, 0xF8A9F4),
+          "generator chain: timer flag 0x5B90EB -> reduction flag 0x5B8F2D (enable CAL 0x1C940A) -> voltage-request fn EXT 0xF8A9D0")
+
     for ok, text in results:
         print(f"[{'PASS' if ok else 'FAIL'}] {text}")
     failed = sum(1 for ok, _ in results if not ok)

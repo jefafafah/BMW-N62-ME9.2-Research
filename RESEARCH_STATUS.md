@@ -1,6 +1,6 @@
 # Research status
 
-Last update: 2026-10-03 (static-analysis round 3).
+Last update: 2026-10-03 (static-analysis round 4).
 
 ## Confidence model
 
@@ -71,14 +71,38 @@ everything under "not located", and all efficiency/mode proposals.
 | EGS driver-wish limit `0x3FBEDD` (0x0B5 byte5 bits6-7) | LIKELY | |
 | Turbine-speed candidate 0x1A2 → `0x5B9982` | LIKELY | |
 | λ scale 4096 = 1.0 (sensor curve `0x1C6D0A`) | HIGH CONFIDENCE | upgraded |
-| Fuel feed-forward divides by λ setpoint; controller factor `0x5B98A0` | CONFIRMED structure | lean target via setpoint is structurally clean |
-| TGENOFVL → `0x1C9412` (full-load-edge generator timer, stock 0) | LIKELY | |
+| Fuel feed-forward divides by λ setpoint; controller factor `0x5B98A0` | CONFIRMED structure | round 4: a target ≠ 1.000 switches the bank to open loop (see below) |
+| TGENOFVL → `0x1C9412` (full-load-edge generator timer, stock 0) | HIGH CONFIDENCE (round 4) | full chain to the voltage request traced |
 | Flap command `0x3FC286` → output channel 12 | CONFIRMED | polarity LIKELY "on = closed" |
 | `0x5B90BB` = vehicle speed (round 2) | REJECTED as stated; now HYPOTHESIS temperature | |
 | Least-invasive efficiency-request point: `max()` at AEVAB entry INT `0x2C088`, gated off during any OEM intervention | analysis (HYPOTHESIS) | `research/aevab-integration-points.md` |
 | Continuous 4/8 via injector cut keeps unfired cylinders pumping air (lean exhaust, NOx/cat risk) | engineering constraint | must be evaluated before any efficiency claim |
 
 Verification: `tools/verify_770b_findings.py` now runs 47 checks (31 round-2 + 16 round-3); all pass on the reference dump.
+
+
+## Round 4 status (cylinder-cut lambda, Valvetronic, torque CAN, outputs)
+
+| Item | Status | Notes |
+|---|---|---|
+| Closed loop suspended on a bank with any cut; integrators reset; feed-forward at cut setpoint | CONFIRMED | `research/cylinder-cut-lambda.md` |
+| Closed loop requires snapped setpoint within ±1 of 0x1000 (unless CAL `0x1C947C` bit2) | CONFIRMED | corrects the round-3 "lean target is clean" reading |
+| IMLEVABS → CAL `0x1C99C2` (+ bank-B `0x1C99C4`, post-overrun `0x1C99C6`) | HIGH CONFIDENCE | air-mass integral restart on cut |
+| Adaptation inhibited during cut (enables depend on release) | LIKELY | learning EXT `0xF54F18` |
+| No compensation for oxygen from unfired cylinders | CONFIRMED (no path) | feedback is suspended instead |
+| Forcing closed loop during sustained skip-fire would enrich active cylinders (factor limit 1.25) | HYPOTHESIS (consequence) | |
+| Valvetronic: DME sends one lift request per bank on private CAN 0x105/0x10D | CONFIRMED (DME side) | no per-cylinder lift; `research/valvetronic.md` |
+| Valvetronic target maps (main `0x1C47E8` etc.) | LIKELY / HYPOTHESIS roles | |
+| VANOS | not located; round-2 candidates REJECTED (air-charge model) | `research/vanos.md` |
+| Knock / fuel-quality adaptation | not located | `research/ignition-knock-fuel-quality.md` |
+| Full-load λ request `0x5B891A` (KFLAMFA candidate `0x1CE1BC`), component protection `0x5B9C2E` | LIKELY / HYPOTHESIS | `research/full-load-enrichment.md` |
+| 0x0A8/0x0A9 torque fields (positions), converter formula | CONFIRMED positions; names LIKELY/HYPOTHESIS | `research/dme-egs-interface.md` |
+| Output stage: channel 6 = thermostat heater (LIKELY), 4 = purge (LIKELY), 12 = flap (CONFIRMED) | mixed | `research/thermal-management.md` |
+| INT `0xAB88` channels 0–11 are digital inputs, not PWM | CONFIRMED (correction) | |
+| DFCO: gear-dependent overrun logic EXT `0xFAE33C`/`0xFAE940` | LIKELY (partial) | `research/overrun-dfco.md` |
+| Sustained 4/8 or 6/8 firing density as an efficiency measure | not supported by OEM lambda/valve design; benefit doubtful | `research/firing-density-feasibility.md` |
+
+Verification: 62 checks (31 + 16 + 15), all pass on the reference dump.
 
 ## Round-2 input limitation
 
@@ -94,4 +118,4 @@ the offsets/descriptions recorded in round 1 (`research/reference-symbols.csv`).
 `research/verified-findings.md`, `research/symbol-map-770B.csv`, `research/560B-to-770B-mapping.md`,
 `research/aevab-redabm.md`, `research/lambda-control.md`, `research/torque-and-modes.md`,
 `research/generator-control.md`, `research/exhaust-flap.md`, `research/thermal-management.md`,
-`research/ignition-vanos-valvetronic.md`, `research/egs-integration-plan.md`, `research/can-and-drive-modes.md`, `research/sport-mode.md`, `research/kickdown-path.md`, `research/dme-egs-interface.md`, `research/aevab-integration-points.md`.
+`research/ignition-vanos-valvetronic.md`, `research/egs-integration-plan.md`, `research/can-and-drive-modes.md`, `research/sport-mode.md`, `research/kickdown-path.md`, `research/dme-egs-interface.md`, `research/aevab-integration-points.md`, `research/cylinder-cut-lambda.md`, `research/valvetronic.md`, `research/vanos.md`, `research/ignition-knock-fuel-quality.md`, `research/full-load-enrichment.md`, `research/overrun-dfco.md`, `research/firing-density-feasibility.md`.

@@ -148,3 +148,18 @@ timer at `0x1C9412`, and the flap output channel. Details: `can-and-drive-modes.
 
 Correction: `0x5B90BB` was listed as "speed-like" in round 2; its thresholds (0xE0, 0xF0) indicate a
 temperature-like quantity (HYPOTHESIS).
+
+---
+
+# Round 4 (2026-10-03) — cylinder-cut lambda, Valvetronic, torque CAN, outputs
+
+15 further checks (62/62 total) cover: bank-cut reset of the air-mass integrators and the IMLEVABS /
+post-overrun thresholds (INT `0x58AE8`); air-mass flow `0x3FC2FC`/`0x3FC2B6` origin; closed-loop
+condition "setpoint ≈ 1.000" (INT `0x570E8`); controller reset and default factor 0x8000;
+Valvetronic per-bank lift requests on CAN 0x105/0x10D (INT `0x4FB78`); output channel 6 ← coolant-target
+fn; the CAN torque converter and the 0x0A8/0x0A9 torque sources; and the generator chain timer →
+`0x5B8F2D` → voltage request.
+
+Corrections in this round: a λ target ≠ 1.000 disables closed loop (round 3 implied it would move
+the controller target); INT `0xAB88` handles digital inputs; the round-2 VANOS candidate fn INT
+`0x406B0` is the air-charge model.

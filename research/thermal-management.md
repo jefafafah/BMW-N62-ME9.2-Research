@@ -59,3 +59,25 @@ thermostat-heater and fan outputs.
 The only distinguishing logic found is the two-level map `0x1D08A8` (high target at low x/y, low
 target at high x/y) plus the hysteresis flags above. A mode-dependent target would need a selector
 on the map output. Status: HYPOTHESIS.
+
+---
+
+# Round 4 additions (2026-10-03): output stage
+
+Digital output stage INT `0x38A54` (driver INT `0xAC00(channel, invert, value)`; `tools/me9_trace.py outputs`):
+
+| Channel | Command RAM | Writer | Identification | Status |
+|---|---|---|---|---|
+| 6 | `0x3FC29B` | EXT `0xF9E148` (coolant-target function; actuator-test override `0x3FC13A`/`0x3FC131`) | **map-thermostat heater** | LIKELY |
+| 7 | `0x3FC29A` | EXT `0xF9DF20` (inputs `0x5B8A27/28` from private-bus frames 0x184/0x18C) | relay tied to the Valvetronic node | HYPOTHESIS |
+| 8 | `0x3FC29F` | EXT `0xF9E6A4` (rpm, full load, temperatures, curve CAL `0x1CBCCC`) | cooling-related relay (fan stage / pump) | HYPOTHESIS |
+| 4 | `0x3FC2B5` | EXT `0xF9ED98` / `0xF9EB30` (they also produce lambda multiplier `0x5B8E3A`, gated by `0x3FC23B`) | **canister-purge valve** | LIKELY |
+| 12 | `0x3FC286` | EXT `0xF97D8C` | exhaust flap | CONFIRMED |
+| 23 / 24 | `0x3FC08D` / `0x3FC08E` | written indirectly; read by lambda functions | lambda-sensor heaters | HYPOTHESIS |
+| 2, 5, 9, 10, 18–22, 38–41 | `0x3FC0B7`, `0x5B8ECA`, `0x3FBFC3`, `0x3FC285`, `0x3FBEEE/EF`, `0x3FC200/01/02`, `0x3FC26F`, `0x3FBEED` | various | not identified | open |
+
+Correction: INT `0x388B0` / driver `0xAB88` (channels 0–11) are digital **inputs** (port image
+`0x3FA374`), not PWM outputs.
+
+The electric fan (PWM) and any PWM thermostat drive are not on the digital stage. Expected on TPU/MIOS
+channels (round 5). Post-run cooling and A/C pressure contribution: not located.

@@ -41,3 +41,35 @@ Log DME RAM through the diagnostic logger and raw PT-CAN (all IDs, timestamps) a
 Manoeuvres: as in `egs-integration-plan.md` §3. Add a static test with the engine running and the
 selector cycled P→R→N→D→S→M, plus M-gate up/down taps. Every unresolved field above should be
 labelled from the time correlation.
+
+---
+
+# Round 4 additions (2026-10-03): torque content of 0x0A8 / 0x0A9 / 0x0AA
+
+Encoding: every torque word passes INT `0x4BCCC` (or `0x4BD40` with `+0x5B9784`):
+`CAN = clamp_s12( ((T >> 1) − (0x5B94BC >> 1)) · 0x5B922A >> 10 )`, where `0x5B94BC` = copy of
+`0x5B97AA` (reference torque) and `0x5B922A` is a scale byte. 0x800 is reserved; the builder sends
+0x801 instead. Producer of the words: INT fn `0x4BDDC`. All field positions below are **CONFIRMED**
+from the packing code in INT `0x4B128`; names are as stated.
+
+| Frame | Bits (Intel, byte0 LSB) | Content (RAM source → word) | Name | Status |
+|---|---|---|---|---|
+| 0x0A8 | 0-7 | checksum `0x5B9222` (byte sum, seed 0xB7) | checksum | LIKELY |
+| 0x0A8 | 8-11 | counter `0x5B9225` | alive counter | LIKELY |
+| 0x0A8 | 12-23 | `0x5B983A` (fn INT `0x4790C`) → `0x5B94CA` (signed variant) | torque incl. intervention (fast path) | HYPOTHESIS |
+| 0x0A8 | 24-27 | `0x5B902C` (EXT `0xFA8E70`) | status nibble | HYPOTHESIS |
+| 0x0A8 | 28-39 | `0x5B9878` (INT fn `0x48F68`) → `0x5B94C6` | torque word (base/indicated candidate) | HYPOTHESIS |
+| 0x0A8 | 40-43 | constant 0xF | — | CONFIRMED |
+| 0x0A8 | 44-55 | 2-bit flags from `0x3FBFAA`, `0x3FBFB0` and others | status | HYPOTHESIS |
+| 0x0A8 | 56-60 / 61-63 | `0x3FDCDD` bits 0-4 / 3-bit field | status | HYPOTHESIS |
+| 0x0A9 | 0-7 / 8-11 | checksum `0x5B9223` / counter `0x5B9226` | | LIKELY |
+| 0x0A9 | 12-15 | 2-bit flags (`0x3FC16F`, …) | status | HYPOTHESIS |
+| 0x0A9 | 16-27 | conv(0) = −(reference torque `0x5B97AA`) scaled → `0x5B94D0` | **loss/drag torque** | LIKELY |
+| 0x0A9 | 28-39 | `0x5B9854` (EXT full-load fn `0xFA4D04`) → `0x5B94CC` | **maximum available torque** | LIKELY |
+| 0x0A9 | 40-51 | `0x5B985C` (= torque reachable without cut, AEVAB input) → `0x5B94D2` | minimum/ignition-limited torque | HYPOTHESIS |
+| 0x0A9 | 52-63 | `0x5B987A` (INT fn `0x48F68`) → `0x5B94C8` | torque word | HYPOTHESIS |
+| 0x0AA | 12-23 | `0x5B980A` (driver-wish fn INT `0x467F0`), forced 0 in overrun cut `0x3FC19F` → `0x5B94CE` | **driver-request torque** | LIKELY |
+| 0x0AA | 24-31, 32-47, 52-55 | pedal byte, rpm ×4, kickdown nibble | (round 3) | CONFIRMED |
+
+Status of the EGS fields from round 3 (0x0BA bits 6/7, 0x1A2 speed, ratio `0x5B981E`): no new
+consumer evidence in round 4. Meanings remain HYPOTHESIS / LIKELY as listed above.
